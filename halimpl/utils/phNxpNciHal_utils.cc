@@ -23,6 +23,10 @@
 #include <phNxpNciHal.h>
 #include <phNxpNciHal_utils.h>
 
+extern uint8_t discovery_cmd[50];
+extern uint8_t discovery_cmd_len;
+extern uint8_t nfcdep_detected;
+
 /*********************** Link list functions **********************************/
 
 /*******************************************************************************
@@ -457,6 +461,16 @@ void phNxpNciHal_print_packet(const char* pString, const uint8_t* p_data,
 *******************************************************************************/
 
 void phNxpNciHal_emergency_recovery(void) {
+  if (nfcFL.chipType == pn548C2 && nfcdep_detected && discovery_cmd_len != 0) {
+    pthread_t pthread;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (pthread_create(&pthread, &attr, (void *(*)(void *))phNxpNciHal_core_reset_recovery,
+                       NULL) == 0) {
+      return;
+    }
+  }
   NXPLOG_NCIHAL_E("%s: abort()", __func__);
   abort();
 }
