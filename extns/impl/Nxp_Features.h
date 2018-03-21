@@ -25,6 +25,7 @@
 #define FW_MOBILE_MAJOR_NUMBER_PN81A 0x02
 #define FW_MOBILE_MAJOR_NUMBER_PN551 0x05
 #define FW_MOBILE_MAJOR_NUMBER_PN557 0x01
+#define FW_MOBILE_MAJOR_NUMBER_PN548AD 0x01
  using namespace std;
 typedef enum {
   unknown,
@@ -60,6 +61,8 @@ extern tNfc_featureList nfcFL;
       nfcFL.chipType = pn553;                                                \
     } else if (chipType == pn67T) {                                          \
       nfcFL.chipType = pn551;                                                \
+    } else if (chipType == pn66T) {                                          \
+      nfcFL.chipType = pn548C2;                                              \
     }                                                                        \
       CONFIGURE_FEATURELIST_NFCC(chipType)                                   \
   }
@@ -90,6 +93,15 @@ extern tNfc_featureList nfcFL;
       nfcFL._PHDNLDNFC_USERDATA_EEPROM_OFFSET = 0x02BCU;                    \
       nfcFL._PHDNLDNFC_USERDATA_EEPROM_LEN = 0x0C00U;                       \
       nfcFL._FW_MOBILE_MAJOR_NUMBER = FW_MOBILE_MAJOR_NUMBER_PN551;         \
+                                                                            \
+    } else if (chipType == pn548C2 || chipType == pn66T) {                  \
+                                                                            \
+      STRCPY_FW_LIB("libpn548ad_fw")                                        \
+      STRCPY_FW_BIN("pn548")                                                \
+                                                                            \
+      nfcFL._PHDNLDNFC_USERDATA_EEPROM_OFFSET = 0x02BCU;                    \
+      nfcFL._PHDNLDNFC_USERDATA_EEPROM_LEN = 0x0C00U;                       \
+      nfcFL._FW_MOBILE_MAJOR_NUMBER = FW_MOBILE_MAJOR_NUMBER_PN548AD;       \
                                                                             \
     }                                                                       \
   }
