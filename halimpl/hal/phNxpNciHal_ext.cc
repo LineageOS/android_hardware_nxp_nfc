@@ -36,6 +36,7 @@ extern uint32_t cleanup_timer;
 extern bool nfc_debug_enabled;
 uint8_t icode_detected = 0x00;
 uint8_t icode_send_eof = 0x00;
+uint8_t nfcdep_detected = 0x00;
 static uint8_t ee_disc_done = 0x00;
 uint8_t EnableP2P_PrioLogic = false;
 static uint32_t RfDiscID = 1;
@@ -140,6 +141,9 @@ NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
   status = NFCSTATUS_SUCCESS;
 
   if (p_ntf[0] == 0x61 && p_ntf[1] == 0x05) {
+    if ((nfcFL.chipType == pn548C2) && (nfcdep_detected)) {
+      nfcdep_detected = 0x00;
+    }
 
     switch (p_ntf[4]) {
       case 0x00:
@@ -153,6 +157,9 @@ NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
         break;
       case 0x03:
         NXPLOG_NCIHAL_D("NxpNci: RF Interface = NFC-DEP");
+        if (nfcFL.chipType == pn548C2) {
+          nfcdep_detected = 0x01;
+        }
         break;
       case 0x80:
         NXPLOG_NCIHAL_D("NxpNci: RF Interface = MIFARE");
@@ -447,6 +454,14 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
       }
       NXPLOG_NCIHAL_D("CORE_RESET_NTF received !");
       NXPLOG_NCIR_E("len = %3d > %s", *p_len, print_buffer);
+      if ((nfcFL.chipType == pn548C2) && nfcdep_detected &&
+          !(p_ntf[2] == 0x06 && p_ntf[3] == 0xA0 && p_ntf[4] == 0x00 &&
+            ((p_ntf[5] == 0xC9 && p_ntf[6] == 0x95 && p_ntf[7] == 0x00 &&
+              p_ntf[8] == 0x00) ||
+             (p_ntf[5] == 0x07 && p_ntf[6] == 0x39 && p_ntf[7] == 0xF2 &&
+              p_ntf[8] == 0x00)))) {
+        nfcdep_detected = 0x00;
+      }
       phNxpNciHal_emergency_recovery();
       status = NFCSTATUS_FAILED;
     } /* Parsing CORE_INIT_RSP*/
@@ -708,6 +723,10 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     NXPLOG_NCIHAL_D("> Polling Loop Started");
     icode_detected = 0;
     icode_send_eof = 0;
+    if (nfcFL.chipType == pn548C2) {
+      // Cache discovery cmd for recovery
+      phNxpNciHal_discovery_cmd_ext(p_cmd_data, *cmd_len);
+    }
   }
   // 22000100
   else if (p_cmd_data[0] == 0x22 && p_cmd_data[1] == 0x00 &&
@@ -861,6 +880,28 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     }
   }
 
+  if (nfcFL.chipType == pn548C2 && p_cmd_data[0] == 0x20 && p_cmd_data[1] == 0x02) {
+    uint8_t temp;
+    uint8_t* p = p_cmd_data + 4;
+    uint8_t* end = p_cmd_data + *cmd_len;
+    while (p < end) {
+      if (*p == 0x53)  // LF_T3T_FLAGS
+      {
+        NXPLOG_NCIHAL_D("> Going through workaround - LF_T3T_FLAGS swap");
+        temp = *(p + 3);
+        *(p + 3) = *(p + 2);
+        *(p + 2) = temp;
+        NXPLOG_NCIHAL_D("> Going through workaround - LF_T3T_FLAGS - End");
+        status = NFCSTATUS_SUCCESS;
+        break;
+      }
+      if (*p == 0xA0) {
+        p += *(p + 2) + 3;
+      } else {
+        p += *(p + 1) + 2;
+      }
+    }
+  }
 
   return status;
 }
