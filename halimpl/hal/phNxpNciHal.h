@@ -33,6 +33,7 @@
 typedef void(phNxpNciHal_control_granted_callback_t)();
 
 /*ROM CODE VERSION FW*/
+#define FW_MOBILE_ROM_VERSION_PN547C2 0x08
 #define FW_MOBILE_ROM_VERSION_PN548AD 0x10
 #define FW_MOBILE_ROM_VERSION_PN551 0x10
 #define FW_MOBILE_ROM_VERSION_PN553 0x11
