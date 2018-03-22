@@ -80,10 +80,10 @@ cc_library_shared {
 }
 
 cc_binary {
-    name: "android.hardware.nfc@1.1-service",
+    name: "android.hardware.nfc@1.1-service-nxp",
     defaults: ["hidl_defaults"],
     proprietary: true,
-    init_rc: ["1.1/android.hardware.nfc@1.1-service.rc"],
+    init_rc: ["1.1/android.hardware.nfc@1.1-service-nxp.rc"],
     relative_install_path: "hw",
     srcs: [
         "1.1/NxpNfcService.cpp",
