@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "46796f90_4002fa06",
+        "filename": "halimpl/hal/phNxpNciHal.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-08-21T04:12:21Z",
+      "side": 1,
+      "message": "why does this need to be global? can\u0027t it just be local to phNxpNciHal_core_reset_recovery ?",
+      "range": {
+        "startLine": 76,
+        "startChar": 0,
+        "endLine": 77,
+        "endChar": 30
+      },
+      "revId": "ffc7860afe41fbc8781bbebad5217ec2b36e0c12",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "46e7841d_dcaf94e6",
+        "filename": "halimpl/hal/phNxpNciHal_ext.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 716,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-08-21T04:12:21Z",
+      "side": 1,
+      "message": "does this incoming command ever actually change?",
+      "range": {
+        "startLine": 716,
+        "startChar": 6,
+        "endLine": 716,
+        "endChar": 35
+      },
+      "revId": "ffc7860afe41fbc8781bbebad5217ec2b36e0c12",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
