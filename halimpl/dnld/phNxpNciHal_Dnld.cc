@@ -1700,7 +1700,7 @@ NFCSTATUS phNxpNciHal_fw_download_seq(uint8_t bClkSrcVal, uint8_t bClkFreqVal) {
   /* Get firmware version */
   if (NFCSTATUS_SUCCESS == phDnldNfc_InitImgInfo()) {
     NXPLOG_FWDNLD_D("phDnldNfc_InitImgInfo:SUCCESS");
-    if (gRecFWDwnld == true) {
+    if ((gRecFWDwnld == true) && (nfcFL.chipType != pn547C2)) {
       status =
           phNxpNciHal_fw_seq_handler(phNxpNciHal_dummy_rec_dwnld_seqhandler);
     } else {
