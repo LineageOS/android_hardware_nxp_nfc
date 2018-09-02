@@ -461,7 +461,7 @@ static NFCSTATUS phNxpNciHal_CheckValidFwVersion(void) {
       }
     }
   }
-  else if (gRecFWDwnld == TRUE) {
+  else if ((nfcFL.chipType != pn547C2) && (gRecFWDwnld == TRUE)) {
     status = NFCSTATUS_SUCCESS;
   }
   else if (wFwVerRsp == 0) {
@@ -832,6 +832,10 @@ int phNxpNciHal_fw_mw_ver_check() {
     status = NFCSTATUS_SUCCESS;
   } else if ((nfcFL.chipType == pn548C2) &&
              (rom_version == FW_MOBILE_ROM_VERSION_PN548AD) &&
+             (fw_maj_ver == 0x01)) {
+    status = NFCSTATUS_SUCCESS;
+  } else if (((nfcFL.chipType == pn547C2) || (nfcFL.chipType == pn65T)) &&
+             (rom_version == FW_MOBILE_ROM_VERSION_PN547) &&
              (fw_maj_ver == 0x01)) {
     status = NFCSTATUS_SUCCESS;
   }
@@ -1408,54 +1412,58 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
       if(num != 0) phNxpNciHal_phase_tirm_offset_sign_update();
     }
 
-    NXPLOG_NCIHAL_D("Performing TVDD Settings");
-    isfound = GetNxpNumValue(NAME_NXP_EXT_TVDD_CFG, &num, sizeof(num));
-    if (isfound > 0) {
-      if (num == 1) {
-        isfound = GetNxpByteArrayValue(NAME_NXP_EXT_TVDD_CFG_1, (char*)buffer,
-                                       bufflen, &retlen);
-        if (retlen > 0) {
-          status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-          if (status != NFCSTATUS_SUCCESS) {
-            NXPLOG_NCIHAL_E("EXT TVDD CFG 1 Settings failed");
-            retry_core_init_cnt++;
-            goto retry_core_init;
+    if (nfcFL.chipType != pn547C2) {
+      NXPLOG_NCIHAL_D("Performing TVDD Settings");
+      isfound = GetNxpNumValue(NAME_NXP_EXT_TVDD_CFG, &num, sizeof(num));
+      if (isfound > 0){
+        if (num == 1) {
+          isfound = GetNxpByteArrayValue(NAME_NXP_EXT_TVDD_CFG_1, (char*)buffer,
+                                         bufflen, &retlen);
+          if (retlen > 0) {
+            status = phNxpNciHal_send_ext_cmd(retlen, buffer);
+            if (status != NFCSTATUS_SUCCESS) {
+              NXPLOG_NCIHAL_E("EXT TVDD CFG 1 Settings failed");
+              retry_core_init_cnt++;
+              goto retry_core_init;
+            }
           }
-        }
-      } else if (num == 2) {
-        isfound = GetNxpByteArrayValue(NAME_NXP_EXT_TVDD_CFG_2, (char*)buffer,
-                                       bufflen, &retlen);
-        if (retlen > 0) {
-          status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-          if (status != NFCSTATUS_SUCCESS) {
-            NXPLOG_NCIHAL_E("EXT TVDD CFG 2 Settings failed");
-            retry_core_init_cnt++;
-            goto retry_core_init;
+        } else if (num == 2) {
+          isfound = GetNxpByteArrayValue(NAME_NXP_EXT_TVDD_CFG_2, (char*)buffer,
+                                         bufflen, &retlen);
+          if (retlen > 0) {
+            status = phNxpNciHal_send_ext_cmd(retlen, buffer);
+            if (status != NFCSTATUS_SUCCESS) {
+              NXPLOG_NCIHAL_E("EXT TVDD CFG 2 Settings failed");
+              retry_core_init_cnt++;
+              goto retry_core_init;
+            }
           }
-        }
-      } else if (num == 3) {
-        isfound = GetNxpByteArrayValue(NAME_NXP_EXT_TVDD_CFG_3, (char*)buffer,
-                                       bufflen, &retlen);
-        if (retlen > 0) {
-          status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-          if (status != NFCSTATUS_SUCCESS) {
-            NXPLOG_NCIHAL_E("EXT TVDD CFG 3 Settings failed");
-            retry_core_init_cnt++;
-            goto retry_core_init;
+        } else if (num == 3) {
+          isfound = GetNxpByteArrayValue(NAME_NXP_EXT_TVDD_CFG_3, (char*)buffer,
+                                         bufflen, &retlen);
+          if (retlen > 0) {
+            status = phNxpNciHal_send_ext_cmd(retlen, buffer);
+            if (status != NFCSTATUS_SUCCESS) {
+              NXPLOG_NCIHAL_E("EXT TVDD CFG 3 Settings failed");
+              retry_core_init_cnt++;
+              goto retry_core_init;
+            }
           }
+        } else {
+          NXPLOG_NCIHAL_E("Wrong Configuration Value %ld", num);
         }
-      } else {
-        NXPLOG_NCIHAL_E("Wrong Configuration Value %ld", num);
       }
     }
     retlen = 0;
-    config_access = false;
+    if (nfcFL.chipType != pn547C2) {
+      config_access = false;
+    }
     NXPLOG_NCIHAL_D("Performing RF Settings BLK 1");
     isfound = GetNxpByteArrayValue(NAME_NXP_RF_CONF_BLK_1, (char*)buffer,
                                    bufflen, &retlen);
     if (retlen > 0) {
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1477,7 +1485,7 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
                                    bufflen, &retlen);
     if (retlen > 0) {
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1499,7 +1507,7 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
                                    bufflen, &retlen);
     if (retlen > 0) {
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1521,7 +1529,7 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
                                    bufflen, &retlen);
     if (retlen > 0) {
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1543,7 +1551,7 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
                                    bufflen, &retlen);
     if (retlen > 0) {
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1565,7 +1573,7 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
                                    bufflen, &retlen);
     if (retlen > 0) {
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1581,7 +1589,9 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
       }
     }
     retlen = 0;
-    config_access = true;
+    if (nfcFL.chipType != pn547C2) {
+        config_access = true;
+    }
     NXPLOG_NCIHAL_D("Performing NAME_NXP_CORE_CONF_EXTN Settings");
     isfound = GetNxpByteArrayValue(NAME_NXP_CORE_CONF_EXTN, (char*)buffer,
                                    bufflen, &retlen);
@@ -1609,13 +1619,15 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
     }
 
     retlen = 0;
-    config_access = false;
+    if (nfcFL.chipType != pn547C2) {
+      config_access = false;
+    }
     isfound = GetNxpByteArrayValue(NAME_NXP_CORE_RF_FIELD, (char*)buffer,
                                    bufflen, &retlen);
     if (retlen > 0) {
       /* NXP ACT Proprietary Ext */
       status = phNxpNciHal_send_ext_cmd(retlen, buffer);
-      if (status == NFCSTATUS_SUCCESS) {
+      if ((nfcFL.chipType != pn547C2) && (status == NFCSTATUS_SUCCESS)) {
         status = phNxpNciHal_CheckRFCmdRespStatus();
         /*STATUS INVALID PARAM 0x09*/
         if (status == 0x09) {
@@ -1630,42 +1642,46 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
         goto retry_core_init;
       }
     }
-    config_access = true;
-
-    retlen = 0;
-    /* NXP SWP switch timeout Setting*/
-    if (GetNxpNumValue(NAME_NXP_SWP_SWITCH_TIMEOUT, (void*)&retlen,
-                       sizeof(retlen))) {
-      // Check the permissible range [0 - 60]
-      if (0 <= retlen && retlen <= 60) {
-        if (0 < retlen) {
-          unsigned int timeout = retlen * 1000;
-          unsigned int timeoutHx = 0x0000;
-
-          char tmpbuffer[10] = {0};
-          snprintf((char*)tmpbuffer, 10, "%04x", timeout);
-          sscanf((char*)tmpbuffer, "%x", &timeoutHx);
-
-          swp_switch_timeout_cmd[7] = (timeoutHx & 0xFF);
-          swp_switch_timeout_cmd[8] = ((timeoutHx & 0xFF00) >> 8);
-        }
-
-        status = phNxpNciHal_send_ext_cmd(sizeof(swp_switch_timeout_cmd),
-                                          swp_switch_timeout_cmd);
-        if (status != NFCSTATUS_SUCCESS) {
-          NXPLOG_NCIHAL_E("SWP switch timeout Setting Failed");
-          retry_core_init_cnt++;
-          goto retry_core_init;
-        }
-      } else {
-        NXPLOG_NCIHAL_E("SWP switch timeout Setting Failed - out of range!");
-      }
+    if (nfcFL.chipType != pn547C2) {
+      config_access = true;
     }
 
-    status = phNxpNciHal_china_tianjin_rf_setting();
-    if (status != NFCSTATUS_SUCCESS) {
-      NXPLOG_NCIHAL_E("phNxpNciHal_china_tianjin_rf_setting failed");
-      return NFCSTATUS_FAILED;
+    retlen = 0;
+    if (nfcFL.chipType != pn547C2) {
+      /* NXP SWP switch timeout Setting*/
+      if (GetNxpNumValue(NAME_NXP_SWP_SWITCH_TIMEOUT, (void*)&retlen,
+                         sizeof(retlen))) {
+        // Check the permissible range [0 - 60]
+        if (0 <= retlen && retlen <= 60) {
+          if (0 < retlen) {
+            unsigned int timeout = retlen * 1000;
+            unsigned int timeoutHx = 0x0000;
+
+            char tmpbuffer[10] = {0};
+            snprintf((char*)tmpbuffer, 10, "%04x", timeout);
+            sscanf((char*)tmpbuffer, "%x", &timeoutHx);
+
+            swp_switch_timeout_cmd[7] = (timeoutHx & 0xFF);
+            swp_switch_timeout_cmd[8] = ((timeoutHx & 0xFF00) >> 8);
+          }
+
+          status = phNxpNciHal_send_ext_cmd(sizeof(swp_switch_timeout_cmd),
+                                            swp_switch_timeout_cmd);
+          if (status != NFCSTATUS_SUCCESS) {
+            NXPLOG_NCIHAL_E("SWP switch timeout Setting Failed");
+            retry_core_init_cnt++;
+            goto retry_core_init;
+          }
+        } else {
+          NXPLOG_NCIHAL_E("SWP switch timeout Setting Failed - out of range!");
+        }
+      }
+
+      status = phNxpNciHal_china_tianjin_rf_setting();
+      if (status != NFCSTATUS_SUCCESS) {
+        NXPLOG_NCIHAL_E("phNxpNciHal_china_tianjin_rf_setting failed");
+        return NFCSTATUS_FAILED;
+      }
     }
     // Update eeprom value
     status = phNxpNciHal_set_mw_eeprom();
@@ -1883,8 +1899,10 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
     buffer = NULL;
   }
   // initialize dummy FW recovery variables
-  gRecFWDwnld = 0;
-  gRecFwRetryCount = 0;
+  if (nfcFL.chipType != pn547C2) {
+    gRecFWDwnld = 0;
+    gRecFwRetryCount = 0;
+  }
   if (!((*p_core_init_rsp_params > 0) && (*p_core_init_rsp_params < 4)))
     phNxpNciHal_core_initialized_complete(status);
   else {
