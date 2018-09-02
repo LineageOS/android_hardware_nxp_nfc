@@ -93,6 +93,7 @@ void phNxpNciHal_ext_init(void) {
 *******************************************************************************/
 NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
   NFCSTATUS status = NFCSTATUS_SUCCESS;
+  uint16_t rf_technology_length_param = 0;
 
   if (p_ntf[0] == 0x61 && p_ntf[1] == 0x05 && *p_len < 14) {
     if(*p_len <= 6) {
@@ -192,6 +193,7 @@ NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
       case 0x80:
         NXPLOG_NCIHAL_D("NxpNci: Protocol = MIFARE");
         break;
+      case 0x8A:
       case 0x81:
         NXPLOG_NCIHAL_D("NxpNci: Protocol = Kovio");
         break;
@@ -219,6 +221,7 @@ NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
       case 0x06:
         NXPLOG_NCIHAL_D("NxpNci: Mode = 15693 Passive Poll");
         break;
+      case 0x77:
       case 0x70:
         NXPLOG_NCIHAL_D("NxpNci: Mode = Kovio");
         break;
@@ -312,6 +315,16 @@ NFCSTATUS phNxpNciHal_process_ext_rsp(uint8_t* p_ntf, uint16_t* p_len) {
   } else if (p_ntf[0] == 0x41 && p_ntf[1] == 0x04 && cleanup_timer != 0) {
     status = NFCSTATUS_FAILED;
     return status;
+  } else if ((nfcFL.chipType == pn547C2) &&
+             (p_ntf[0] == 0x61 && p_ntf[1] == 0x05 && p_ntf[4] == 0x02 &&
+              p_ntf[5] == 0x80 && p_ntf[6] == 0x00)) {
+    NXPLOG_NCIHAL_D(
+        "Going through workaround - iso-dep  interface  mifare protocol with "
+        "sak value not equal to 0x20");
+    rf_technology_length_param = p_ntf[9];
+    if ((p_ntf[9 + rf_technology_length_param] & 0x20) != 0x20) {
+      p_ntf[4] = 0x80;
+    }
   }
   else if (*p_len == 4 && p_ntf[0] == 0x4F && p_ntf[1] == 0x11 &&
            p_ntf[2] == 0x01) {
@@ -695,12 +708,18 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     if (nxpncihal_ctrl.nci_info.nci_version != NCI_VERSION_2_0) {
       NXPLOG_NCIHAL_D("> Going through workaround - set host list");
 
+    if (nfcFL.chipType == pn547C2) {
+      *cmd_len = 7;
+
+       p_cmd_data[2] = 0x04;
+       p_cmd_data[6] = 0xC0;
+    } else {
       *cmd_len = 8;
 
       p_cmd_data[2] = 0x05;
       p_cmd_data[6] = 0x02;
       p_cmd_data[7] = 0xC0;
-
+    }
       NXPLOG_NCIHAL_D("> Going through workaround - set host list - END");
       status = NFCSTATUS_SUCCESS;
     }
