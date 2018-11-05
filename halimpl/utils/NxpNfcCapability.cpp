@@ -54,6 +54,10 @@ tNFC_chipType capability::getChipType(uint8_t* msg, uint16_t msg_len) {
     if ((offsetHwVersion > 0) && (offsetHwVersion < msg_len)) {
       ALOGD("%s HwVersion : 0x%02x", __func__, msg[offsetHwVersion]);
       switch (msg[offsetHwVersion]) {
+        case 0x01:  // NQ110, NQ120
+          chipType = pn547C2;
+          break;
+
         case 0x40:  // PN553 A0
         case 0x41:  // PN553 B0
           // NQ310
