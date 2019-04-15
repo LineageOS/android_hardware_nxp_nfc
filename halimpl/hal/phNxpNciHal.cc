@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 
 using namespace android::hardware::nfc::V1_1;
+using namespace android::hardware::nfc::V1_2;
 using android::hardware::nfc::V1_1::NfcEvent;
 
 /*********************** Global Variables *************************************/
@@ -2225,12 +2226,12 @@ int phNxpNciHal_configDiscShutdown(void) {
  *
  ******************************************************************************/
 
-void phNxpNciHal_getVendorConfig(NfcConfig& config) {
+void phNxpNciHal_getVendorConfig(android::hardware::nfc::V1_1::NfcConfig& config) {
   unsigned long num = 0;
   std::array<uint8_t, NXP_MAX_CONFIG_STRING_LEN> buffer;
   buffer.fill(0);
   long retlen = 0;
-  memset(&config, 0x00, sizeof(NfcConfig));
+  memset(&config, 0x00, sizeof(android::hardware::nfc::V1_1::NfcConfig));
 
   phNxpNciHal_getPersistUiccSetting();
 
@@ -2285,6 +2286,42 @@ void phNxpNciHal_getVendorConfig(NfcConfig& config) {
   if ((GetNxpNumValue(NAME_PRESENCE_CHECK_ALGORITHM, &num, sizeof(num))) && (num <= 2) ) {
       config.presenceCheckAlgorithm = (PresenceCheckAlgorithm)num;
   }
+}
+
+/******************************************************************************
+ * Function         phNxpNciHal_getVendorConfig_1_2
+ *
+ * Description      This function can be used by HAL to inform
+ *                 to update vendor configuration parametres
+ *
+ * Returns          void.
+ *
+ ******************************************************************************/
+
+void phNxpNciHal_getVendorConfig_1_2(android::hardware::nfc::V1_2::NfcConfig& config) {
+  unsigned long num = 0;
+  std::array<uint8_t, NXP_MAX_CONFIG_STRING_LEN> buffer;
+  buffer.fill(0);
+  long retlen = 0;
+  memset(&config, 0x00, sizeof(android::hardware::nfc::V1_2::NfcConfig));
+  phNxpNciHal_getVendorConfig(config.v1_1);
+
+  if (GetNxpByteArrayValue(NAME_OFFHOST_ROUTE_UICC, (char*)buffer.data(), buffer.size(), &retlen)) {
+    config.offHostRouteUicc.resize(retlen);
+    for(int i=0; i<retlen; i++)
+      config.offHostRouteUicc[i] = buffer[i];
+  }
+
+  if (GetNxpByteArrayValue(NAME_OFFHOST_ROUTE_ESE, (char*)buffer.data(), buffer.size(), &retlen)) {
+    config.offHostRouteEse.resize(retlen);
+    for(int i=0; i<retlen; i++)
+      config.offHostRouteEse[i] = buffer[i];
+  }
+
+  if (GetNxpNumValue(NAME_DEFAULT_ISODEP_ROUTE, &num, sizeof(num))) {
+      config.defaultIsoDepRoute = num;
+  }
+
 }
 
 /******************************************************************************
