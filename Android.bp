@@ -46,6 +46,7 @@ cc_library_shared {
         "halimpl/utils/phNxpConfig.cpp",
         "halimpl/utils/phNxpNciHal_utils.cc",
         "halimpl/utils/sparse_crc32.cc",
+        "halimpl/utils/NfccPowerTracker.cpp",
     ],
 
     local_include_dirs: [
