@@ -13,13 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include "NfccPowerTracker.h"
+#include "hal_nxpese.h"
+#include "hal_nxpnfc.h"
+#include "spi_spm.h"
+#include <EseAdaptation.h>
+#include <cutils/properties.h>
 #include <log/log.h>
 #include <phDal4Nfc_messageQueueLib.h>
 #include <phDnldNfc.h>
 #include <phNxpConfig.h>
 #include <phNxpLog.h>
-#include <cutils/properties.h>
 #include <phNxpNciHal.h>
 #include <phNxpNciHal_Adaptation.h>
 #include <phNxpNciHal_Dnld.h>
@@ -27,12 +31,9 @@
 #include <phNxpNciHal_ext.h>
 #include <phTmlNfc.h>
 #include <sys/stat.h>
-#include <EseAdaptation.h>
-#include "hal_nxpnfc.h"
-#include "hal_nxpese.h"
-#include "spi_spm.h"
 
 using namespace android::hardware::nfc::V1_1;
+using namespace android::hardware::nfc::V1_2;
 using android::hardware::nfc::V1_1::NfcEvent;
 
 /*********************** Global Variables *************************************/
@@ -728,7 +729,7 @@ force_download:
       NXPLOG_NCIHAL_D("FW download Success");
     }
   }
-
+  NfccPowerTracker::getInstance().Initialize();
   /* Call open complete */
   phNxpNciHal_MinOpen_complete(wConfigStatus);
   NXPLOG_NCIHAL_D("phNxpNciHal_MinOpen(): exit");
@@ -974,6 +975,9 @@ int phNxpNciHal_write_unlocked(uint16_t data_len, const uint8_t* p_data) {
     goto clean_and_return;
   }
 
+  NfccPowerTracker::getInstance().ProcessCmd(
+      (uint8_t *)nxpncihal_ctrl.p_cmd_data, (uint16_t)nxpncihal_ctrl.cmd_len);
+
 retry:
 
   data_len = nxpncihal_ctrl.cmd_len;
@@ -1107,6 +1111,10 @@ static void phNxpNciHal_read_complete(void* pContext,
 
     phNxpNciHal_print_res_status(pInfo->pBuff, &pInfo->wLength);
 
+    if ((nxpncihal_ctrl.p_rx_data[0x00] & NCI_MT_MASK) == NCI_MT_NTF) {
+      NfccPowerTracker::getInstance().ProcessNtf(nxpncihal_ctrl.p_rx_data,
+                                                 nxpncihal_ctrl.rx_data_len);
+    }
     /* Check if response should go to hal module only */
     if (nxpncihal_ctrl.hal_ext_enabled == TRUE &&
         (nxpncihal_ctrl.p_rx_data[0x00] & NCI_MT_MASK) == NCI_MT_RSP) {
@@ -2153,7 +2161,7 @@ int phNxpNciHal_close(bool bShutdown) {
 
     NXPLOG_NCIHAL_D("phNxpNciHal_close - phOsalNfc_DeInit completed");
   }
-
+  NfccPowerTracker::getInstance().Pause();
   CONCURRENCY_UNLOCK();
 
   phNxpNciHal_cleanup_monitor();
@@ -2197,6 +2205,7 @@ void phNxpNciHal_close_complete(NFCSTATUS status) {
  ******************************************************************************/
 int phNxpNciHal_configDiscShutdown(void) {
   NFCSTATUS status;
+  NfccPowerTracker::getInstance().Reset();
 
   status = phNxpNciHal_close(true);
   if(status != NFCSTATUS_SUCCESS) {
@@ -2217,12 +2226,12 @@ int phNxpNciHal_configDiscShutdown(void) {
  *
  ******************************************************************************/
 
-void phNxpNciHal_getVendorConfig(NfcConfig& config) {
+void phNxpNciHal_getVendorConfig(android::hardware::nfc::V1_1::NfcConfig& config) {
   unsigned long num = 0;
   std::array<uint8_t, NXP_MAX_CONFIG_STRING_LEN> buffer;
   buffer.fill(0);
   long retlen = 0;
-  memset(&config, 0x00, sizeof(NfcConfig));
+  memset(&config, 0x00, sizeof(android::hardware::nfc::V1_1::NfcConfig));
 
   phNxpNciHal_getPersistUiccSetting();
 
@@ -2277,6 +2286,42 @@ void phNxpNciHal_getVendorConfig(NfcConfig& config) {
   if ((GetNxpNumValue(NAME_PRESENCE_CHECK_ALGORITHM, &num, sizeof(num))) && (num <= 2) ) {
       config.presenceCheckAlgorithm = (PresenceCheckAlgorithm)num;
   }
+}
+
+/******************************************************************************
+ * Function         phNxpNciHal_getVendorConfig_1_2
+ *
+ * Description      This function can be used by HAL to inform
+ *                 to update vendor configuration parametres
+ *
+ * Returns          void.
+ *
+ ******************************************************************************/
+
+void phNxpNciHal_getVendorConfig_1_2(android::hardware::nfc::V1_2::NfcConfig& config) {
+  unsigned long num = 0;
+  std::array<uint8_t, NXP_MAX_CONFIG_STRING_LEN> buffer;
+  buffer.fill(0);
+  long retlen = 0;
+  memset(&config, 0x00, sizeof(android::hardware::nfc::V1_2::NfcConfig));
+  phNxpNciHal_getVendorConfig(config.v1_1);
+
+  if (GetNxpByteArrayValue(NAME_OFFHOST_ROUTE_UICC, (char*)buffer.data(), buffer.size(), &retlen)) {
+    config.offHostRouteUicc.resize(retlen);
+    for(int i=0; i<retlen; i++)
+      config.offHostRouteUicc[i] = buffer[i];
+  }
+
+  if (GetNxpByteArrayValue(NAME_OFFHOST_ROUTE_ESE, (char*)buffer.data(), buffer.size(), &retlen)) {
+    config.offHostRouteEse.resize(retlen);
+    for(int i=0; i<retlen; i++)
+      config.offHostRouteEse[i] = buffer[i];
+  }
+
+  if (GetNxpNumValue(NAME_DEFAULT_ISODEP_ROUTE, &num, sizeof(num))) {
+      config.defaultIsoDepRoute = num;
+  }
+
 }
 
 /******************************************************************************
