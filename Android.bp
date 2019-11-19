@@ -22,7 +22,7 @@ cc_library_shared {
         "-Werror",
         "-Wextra",
         // Allow implicit fallthroughs in phDnldNfc_Internal.cc and phNxpConfig.cpp until they are fixed.
-        "-Wno-error=implicit-fallthrough",
+        "-Wno-implicit-fallthrough",
     ],
 
     srcs: [
