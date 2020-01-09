@@ -47,6 +47,7 @@ cc_library_shared {
         "halimpl/utils/phNxpNciHal_utils.cc",
         "halimpl/utils/sparse_crc32.cc",
         "halimpl/utils/NfccPowerTracker.cpp",
+        "halimpl/mifare/NxpMfcReader.cc",
     ],
 
     local_include_dirs: [
@@ -57,6 +58,7 @@ cc_library_shared {
         "halimpl/src/include",
         "halimpl/tml",
         "halimpl/utils",
+        "halimpl/mifare",
     ],
 
     export_include_dirs: [
