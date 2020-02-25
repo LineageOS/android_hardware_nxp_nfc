@@ -36,6 +36,7 @@ static const std::string POWER_TRACKER_LOG_FILE =
 static const uint16_t TIMER_COUNT_MASK = 0x7FFF;
 
 NfccPowerTracker::NfccPowerTracker() {
+  mIsLastUpdateScreenOn = false;
   mIsFirstPwrTrkNtfRecvd = false;
   mLastPowerTrackAborted = false;
   /*Default standby time*/
