@@ -71,6 +71,7 @@ static uint8_t evt_status;
 **
 *******************************************************************************/
 EseAdaptation::EseAdaptation() {
+  mCurrentIoctlData = NULL;
   memset(&mSpiHalEntryFuncs, 0, sizeof(mSpiHalEntryFuncs));
 }
 
