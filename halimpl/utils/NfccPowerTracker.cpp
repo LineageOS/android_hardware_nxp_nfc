@@ -251,7 +251,7 @@ void NfccPowerTracker::ProcessPowerTrackNtf(uint8_t *rsp, uint16_t rsp_len) {
     }
     mActiveInfo.totalTransitions++;
   } else {
-    standbyTime = (sPollCount * mStandbyTimePerDiscLoopInMillisec);
+    standbyTime = (sPollCount * ((uint64_t)mStandbyTimePerDiscLoopInMillisec));
     activeTime = totalDuration > standbyTime ? (totalDuration - standbyTime)
                                              : (standbyTime - totalDuration);
     if (rsp[3]) {
