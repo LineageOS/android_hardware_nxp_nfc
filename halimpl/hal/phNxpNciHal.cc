@@ -128,8 +128,10 @@ static NFCSTATUS phNxpNciHalRFConfigCmdRecSequence();
 static NFCSTATUS phNxpNciHal_CheckRFCmdRespStatus();
 int check_config_parameter();
 void phNxpNciHal_phase_tirm_offset_sign_update();
+#ifdef FactoryOTA
 void phNxpNciHal_isFactoryOTAModeActive();
 static NFCSTATUS phNxpNciHal_disableFactoryOTAMode(void);
+#endif
 /******************************************************************************
  * Function         phNxpNciHal_initialize_debug_enabled_flag
  *
@@ -1954,7 +1956,7 @@ void phNxpNciHal_phase_tirm_offset_sign_update() {
   return;
 }
 
-
+#ifdef FactoryOTA
 void phNxpNciHal_isFactoryOTAModeActive() {
   uint8_t check_factoryOTA[] = {0x20, 0x03, 0x05, 0x02, 0xA0, 0x08, 0xA0, 0x88};
   NFCSTATUS status = NFCSTATUS_FAILED;
@@ -1992,6 +1994,7 @@ NFCSTATUS phNxpNciHal_disableFactoryOTAMode() {
   }
   return status;
 }
+#endif
 
 /******************************************************************************
  * Function         phNxpNciHal_CheckRFCmdRespStatus
@@ -2147,7 +2150,7 @@ int phNxpNciHal_close(bool bShutdown) {
       NXPLOG_NCIHAL_E("CMD_VEN_DISABLE_NCI: Failed");
     }
   }
-
+#ifdef FactoryOTA
   char valueStr[PROPERTY_VALUE_MAX] = {0};
   bool factoryOTA_terminate = false;
   int len = property_get("persist.factoryota.reboot", valueStr, "normal");
@@ -2159,7 +2162,7 @@ int phNxpNciHal_close(bool bShutdown) {
     phNxpNciHal_disableFactoryOTAMode();
     phNxpNciHal_isFactoryOTAModeActive();
   }
-
+#endif
   nxpncihal_ctrl.halStatus = HAL_STATUS_CLOSE;
 
   status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
