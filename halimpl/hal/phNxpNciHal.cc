@@ -127,7 +127,6 @@ NFCSTATUS phNxpNciHal_getChipInfoInFwDnldMode(void);
 static NFCSTATUS phNxpNciHalRFConfigCmdRecSequence();
 static NFCSTATUS phNxpNciHal_CheckRFCmdRespStatus();
 int check_config_parameter();
-void phNxpNciHal_phase_tirm_offset_sign_update();
 #ifdef FactoryOTA
 void phNxpNciHal_isFactoryOTAModeActive();
 static NFCSTATUS phNxpNciHal_disableFactoryOTAMode(void);
@@ -1441,10 +1440,6 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
     retlen = 0;
     fw_download_success = 0;
 
-    if(GetNxpNumValue(NAME_NXP_PHASE_TIRM_OFFSET_SIGN_UPDATE, &num, sizeof(num))) {
-      if(num != 0) phNxpNciHal_phase_tirm_offset_sign_update();
-    }
-
     NXPLOG_NCIHAL_D("Performing TVDD Settings");
     isfound = GetNxpNumValue(NAME_NXP_EXT_TVDD_CFG, &num, sizeof(num));
     if (isfound > 0) {
@@ -1929,34 +1924,6 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
   }
 #endif
   return NFCSTATUS_SUCCESS;
-}
-
-void phNxpNciHal_phase_tirm_offset_sign_update() {
-  uint8_t phase_tirm_offset_read[] = {0x20, 0x03, 0x03, 0x01, 0xA0, 0x17};
-  uint8_t phase_tirm_offset_write[] = {0x20, 0x02, 0x05, 0x01, 0xA0, 0x17, 0x01, 0x80};
-  NFCSTATUS status = NFCSTATUS_FAILED;
-
-  NXPLOG_NCIHAL_D("check A017 mode status");
-
-  status = phNxpNciHal_send_ext_cmd(sizeof(phase_tirm_offset_read), phase_tirm_offset_read);
-
-  if (status == NFCSTATUS_SUCCESS) {
-    if((nxpncihal_ctrl.p_rx_data[8] & 0x40) == 0x40) {
-      NXPLOG_NCIHAL_D("Set new tirm offset sing update");
-      phase_tirm_offset_write[7] |= nxpncihal_ctrl.p_rx_data[8] & 0x3F;
-      status = phNxpNciHal_send_ext_cmd(sizeof(phase_tirm_offset_write), phase_tirm_offset_write);
-      if (status == NFCSTATUS_SUCCESS) {
-        NXPLOG_NCIHAL_D("Phase tirm offset updated");
-      } else {
-        NXPLOG_NCIHAL_E("Phase tirm offset update error");
-      }
-    } else {
-      NXPLOG_NCIHAL_D("Phase tirm offset OK");
-    }
-  } else {
-    NXPLOG_NCIHAL_E("Fail to get phase tirm offset status");
-  }
-  return;
 }
 
 #ifdef FactoryOTA
