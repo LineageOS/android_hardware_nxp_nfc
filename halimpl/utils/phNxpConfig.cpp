@@ -46,6 +46,7 @@
 
 #include <phNxpConfig.h>
 #include <phNxpLog.h>
+#include <errno.h>
 #include "sparse_crc32.h"
 #if GENERIC_TARGET
 const char alternative_config_path[] = "/data/vendor/nfc/";
@@ -78,8 +79,16 @@ size_t readConfigFile(const char* fileName, uint8_t** p_data) {
   fseek(fd, 0L, SEEK_END);
   const size_t file_size = ftell(fd);
   rewind(fd);
-
+  if((long)file_size < 0) {
+    ALOGE("%s Invalid file size file_size = %zu\n",__func__,file_size);
+    fclose(fd);
+    return 0;
+  }
   uint8_t* buffer = new uint8_t[file_size];
+  if (!buffer) {
+    fclose(fd);
+    return 0;
+  }
   size_t read = fread(buffer, file_size, 1, fd);
   fclose(fd);
 
@@ -411,7 +420,10 @@ bool CNfcConfig::readConfig(const char* name, bool bResetContent) {
 ** Returns:     none
 **
 *******************************************************************************/
-CNfcConfig::CNfcConfig() : mValidFile(true), state(0) {}
+CNfcConfig::CNfcConfig()
+    : mValidFile(true),
+      config_crc32_(0),
+      state(0) {}
 
 /*******************************************************************************
 **
@@ -662,7 +674,9 @@ bool CNfcConfig::isModified() {
   }
 
   uint32_t stored_crc32 = 0;
-  fread(&stored_crc32, sizeof(uint32_t), 1, fd);
+  if (fread(&stored_crc32, sizeof(uint32_t), 1, fd) != 1) {
+    ALOGE("%s File read is not successful errno = %d", __func__, errno);
+  }
   fclose(fd);
 
   return stored_crc32 != config_crc32_;
