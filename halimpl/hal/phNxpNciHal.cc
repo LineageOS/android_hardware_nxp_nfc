@@ -127,9 +127,10 @@ NFCSTATUS phNxpNciHal_getChipInfoInFwDnldMode(void);
 static NFCSTATUS phNxpNciHalRFConfigCmdRecSequence();
 static NFCSTATUS phNxpNciHal_CheckRFCmdRespStatus();
 int check_config_parameter();
-void phNxpNciHal_phase_tirm_offset_sign_update();
+#ifdef FactoryOTA
 void phNxpNciHal_isFactoryOTAModeActive();
 static NFCSTATUS phNxpNciHal_disableFactoryOTAMode(void);
+#endif
 /******************************************************************************
  * Function         phNxpNciHal_initialize_debug_enabled_flag
  *
@@ -597,7 +598,8 @@ int phNxpNciHal_MinOpen (){
 
   /*Init binary semaphore for Spi Nfc synchronization*/
   if (0 != sem_init(&nxpncihal_ctrl.syncSpiNfc, 0, 1)) {
-    wConfigStatus = NFCSTATUS_FAILED;
+    NXPLOG_NCIHAL_E("sem_init() FAiled, errno = 0x%02X", errno);
+    goto clean_and_return;
   }
 
   /* By default HAL status is HAL_STATUS_OPEN */
@@ -613,7 +615,7 @@ int phNxpNciHal_MinOpen (){
     NXPLOG_NCIHAL_D("malloc of nfc_dev_node failed ");
     goto clean_and_return;
   } else if (!GetNxpStrValue(NAME_NXP_NFC_DEV_NODE, nfc_dev_node,
-                             sizeof(nfc_dev_node))) {
+                             max_len)) {
     NXPLOG_NCIHAL_D(
         "Invalid nfc device node name keeping the default device node "
         "/dev/pn54x");
@@ -719,6 +721,9 @@ init_retry:
   phNxpNciHal_enable_i2c_fragmentation();
   /*Get FW version from device*/
   status = phDnldNfc_InitImgInfo();
+  if (status != NFCSTATUS_SUCCESS) {
+    NXPLOG_NCIHAL_E("Image information extraction Failed!!");
+  }
   NXPLOG_NCIHAL_D("FW version for FW file = 0x%x", wFwVer);
   NXPLOG_NCIHAL_D("FW version from device = 0x%x", wFwVerRsp);
   if ((wFwVerRsp & 0x0000FFFF) == wFwVer) {
@@ -963,7 +968,10 @@ int phNxpNciHal_write_internal(uint16_t data_len, const uint8_t* p_data) {
   if (icode_send_eof == 1) {
     usleep(10000);
     icode_send_eof = 2;
-    phNxpNciHal_send_ext_cmd(3, cmd_icode_eof);
+    status = phNxpNciHal_send_ext_cmd(3, cmd_icode_eof);
+    if (status != NFCSTATUS_SUCCESS) {
+      NXPLOG_NCIHAL_E("ICODE end of frame command failed");
+    }
   }
 
 clean_and_return:
@@ -1431,10 +1439,6 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
   if (isNxpConfigModified() || (fw_download_success == 1)) {
     retlen = 0;
     fw_download_success = 0;
-
-    if(GetNxpNumValue(NAME_NXP_PHASE_TIRM_OFFSET_SIGN_UPDATE, &num, sizeof(num))) {
-      if(num != 0) phNxpNciHal_phase_tirm_offset_sign_update();
-    }
 
     NXPLOG_NCIHAL_D("Performing TVDD Settings");
     isfound = GetNxpNumValue(NAME_NXP_EXT_TVDD_CFG, &num, sizeof(num));
@@ -1922,35 +1926,7 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
   return NFCSTATUS_SUCCESS;
 }
 
-void phNxpNciHal_phase_tirm_offset_sign_update() {
-  uint8_t phase_tirm_offset_read[] = {0x20, 0x03, 0x03, 0x01, 0xA0, 0x17};
-  uint8_t phase_tirm_offset_write[] = {0x20, 0x02, 0x05, 0x01, 0xA0, 0x17, 0x01, 0x80};
-  NFCSTATUS status = NFCSTATUS_FAILED;
-
-  NXPLOG_NCIHAL_D("check A017 mode status");
-
-  status = phNxpNciHal_send_ext_cmd(sizeof(phase_tirm_offset_read), phase_tirm_offset_read);
-
-  if (status == NFCSTATUS_SUCCESS) {
-    if((nxpncihal_ctrl.p_rx_data[8] & 0x40) == 0x40) {
-      NXPLOG_NCIHAL_D("Set new tirm offset sing update");
-      phase_tirm_offset_write[7] |= nxpncihal_ctrl.p_rx_data[8] & 0x3F;
-      status = phNxpNciHal_send_ext_cmd(sizeof(phase_tirm_offset_write), phase_tirm_offset_write);
-      if (status == NFCSTATUS_SUCCESS) {
-        NXPLOG_NCIHAL_D("Phase tirm offset updated");
-      } else {
-        NXPLOG_NCIHAL_E("Phase tirm offset update error");
-      }
-    } else {
-      NXPLOG_NCIHAL_D("Phase tirm offset OK");
-    }
-  } else {
-    NXPLOG_NCIHAL_E("Fail to get phase tirm offset status");
-  }
-  return;
-}
-
-
+#ifdef FactoryOTA
 void phNxpNciHal_isFactoryOTAModeActive() {
   uint8_t check_factoryOTA[] = {0x20, 0x03, 0x05, 0x02, 0xA0, 0x08, 0xA0, 0x88};
   NFCSTATUS status = NFCSTATUS_FAILED;
@@ -1988,6 +1964,7 @@ NFCSTATUS phNxpNciHal_disableFactoryOTAMode() {
   }
   return status;
 }
+#endif
 
 /******************************************************************************
  * Function         phNxpNciHal_CheckRFCmdRespStatus
@@ -2143,7 +2120,7 @@ int phNxpNciHal_close(bool bShutdown) {
       NXPLOG_NCIHAL_E("CMD_VEN_DISABLE_NCI: Failed");
     }
   }
-
+#ifdef FactoryOTA
   char valueStr[PROPERTY_VALUE_MAX] = {0};
   bool factoryOTA_terminate = false;
   int len = property_get("persist.factoryota.reboot", valueStr, "normal");
@@ -2155,7 +2132,7 @@ int phNxpNciHal_close(bool bShutdown) {
     phNxpNciHal_disableFactoryOTAMode();
     phNxpNciHal_isFactoryOTAModeActive();
   }
-
+#endif
   nxpncihal_ctrl.halStatus = HAL_STATUS_CLOSE;
 
   status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
@@ -3045,8 +3022,12 @@ void phNxpNciHal_enable_i2c_fragmentation() {
   static uint8_t cmd_init_nci2_0[] = {0x20, 0x01, 0x02, 0x00, 0x00};
   static uint8_t get_i2c_fragmentation_cmd[] = {0x20, 0x03, 0x03,
                                                 0x01, 0xA0, 0x05};
-  GetNxpNumValue(NAME_NXP_I2C_FRAGMENTATION_ENABLED, (void*)&i2c_status,
-                 sizeof(i2c_status));
+  if (GetNxpNumValue(NAME_NXP_I2C_FRAGMENTATION_ENABLED, (void*)&i2c_status,
+                 sizeof(i2c_status)) == true) {
+    NXPLOG_FWDNLD_D("I2C status : %ld",i2c_status);
+  } else {
+    NXPLOG_FWDNLD_E("I2C status read not succeeded. Default value : %ld",i2c_status);
+  }
   status = phNxpNciHal_send_ext_cmd(sizeof(get_i2c_fragmentation_cmd),
                                     get_i2c_fragmentation_cmd);
   if (status != NFCSTATUS_SUCCESS) {
