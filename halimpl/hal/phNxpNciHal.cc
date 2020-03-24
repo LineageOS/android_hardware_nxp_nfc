@@ -1684,7 +1684,8 @@ int phNxpNciHal_core_initialized(uint8_t* p_core_init_rsp_params) {
     status = phNxpNciHal_china_tianjin_rf_setting();
     if (status != NFCSTATUS_SUCCESS) {
       NXPLOG_NCIHAL_E("phNxpNciHal_china_tianjin_rf_setting failed");
-      return NFCSTATUS_FAILED;
+      retry_core_init_cnt++;
+      goto retry_core_init;
     }
     // Update eeprom value
     status = phNxpNciHal_set_mw_eeprom();
