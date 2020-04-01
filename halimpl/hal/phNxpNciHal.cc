@@ -42,7 +42,7 @@ using android::hardware::nfc::V1_1::NfcEvent;
 
 bool bEnableMfcExtns = false;
 bool bEnableMfcReader = false;
-bool bDisableLegacyMfcExtns = false;
+bool bDisableLegacyMfcExtns = true;
 
 /* Processing of ISO 15693 EOF */
 extern uint8_t icode_send_eof;
@@ -3246,7 +3246,7 @@ static void phNxpNciHal_print_res_status(uint8_t* p_rx_data, uint16_t* p_len) {
 static void phNxpNciHal_initialize_mifare_flag() {
   unsigned long num = 0;
   bEnableMfcReader = false;
-  bDisableLegacyMfcExtns = false;
+  bDisableLegacyMfcExtns = true;
   //1: Enable Mifare Classic protocol in RF Discovery.
   //0: Remove Mifare Classic protocol in RF Discovery.
   if(GetNxpNumValue(NAME_MIFARE_READER_ENABLE, &num, sizeof(num))) {
