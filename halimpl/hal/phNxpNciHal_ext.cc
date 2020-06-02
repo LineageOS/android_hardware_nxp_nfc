@@ -679,7 +679,8 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     }
   }
 
-  if (retval == 0x01 && p_cmd_data[0] == 0x21 && p_cmd_data[1] == 0x00) {
+  if (*cmd_len <= (NCI_MAX_DATA_LEN - 3) &&
+      retval == 0x01 && p_cmd_data[0] == 0x21 && p_cmd_data[1] == 0x00) {
     NXPLOG_NCIHAL_D("Going through extns - Adding Mifare in RF Discovery");
     p_cmd_data[2] += 3;
     p_cmd_data[3] += 1;
@@ -793,7 +794,8 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     phNxpNciHal_print_packet("RECV", p_rsp_data, 5);
     //        status = NFCSTATUS_FAILED;
     NXPLOG_NCIHAL_D("> Going through workaround - Dirty Set Config - End ");
-  } else if (p_cmd_data[0] == 0x21 && p_cmd_data[1] == 0x00) {
+  } else if (*cmd_len <= (NCI_MAX_DATA_LEN - 3) &&
+             p_cmd_data[0] == 0x21 && p_cmd_data[1] == 0x00) {
     NXPLOG_NCIHAL_D(
         "> Going through workaround - Add Mifare Classic in Discovery Map");
     p_cmd_data[*cmd_len] = 0x80;
@@ -942,6 +944,10 @@ NFCSTATUS phNxpNciHal_send_ext_cmd(uint16_t cmd_len, uint8_t* p_cmd) {
  ******************************************************************************/
 NFCSTATUS phNxpNciHal_send_ese_hal_cmd(uint16_t cmd_len, uint8_t* p_cmd) {
   NFCSTATUS status = NFCSTATUS_FAILED;
+  if (cmd_len > NCI_MAX_DATA_LEN) {
+    NXPLOG_NCIHAL_E("cmd_len exceeds limit NCI_MAX_DATA_LEN");
+    return status;
+  }
   nxpncihal_ctrl.cmd_len = cmd_len;
   memcpy(nxpncihal_ctrl.p_cmd_data, p_cmd, cmd_len);
   status = phNxpNciHal_process_ext_cmd_rsp(nxpncihal_ctrl.cmd_len,
