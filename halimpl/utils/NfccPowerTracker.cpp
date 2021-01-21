@@ -126,10 +126,19 @@ void NfccPowerTracker::ProcessCmd(uint8_t *cmd, uint16_t len) {
   ALOGD_IF(nfc_debug_enabled,
            "NfccPowerTracker::ProcessCmd: Enter,Recieved len :%d", len);
   bool screenStateCommand;
+
+  if (len < 4) {
+    android_errorWriteLog(0x534e4554, "153879824");
+    return;
+  }
   if (cmd[0] == 0x20 && cmd[1] == 0x09) {
     screenStateCommand = true;
   } else {
     screenStateCommand = false;
+    if (len < 8) {
+      android_errorWriteLog(0x534e4554, "153879824");
+      return;
+    }
   }
 
   if (screenStateCommand && (cmd[3] == 0x00 || cmd[3] == 0x02)) {
