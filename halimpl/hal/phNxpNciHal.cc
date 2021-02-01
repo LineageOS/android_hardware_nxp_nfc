@@ -80,6 +80,7 @@ static uint8_t Rx_data[NCI_MAX_DATA_LEN];
 extern int phPalEse_spi_ioctl(phPalEse_ControlCode_t eControlCode,void *pDevHandle, long level);
 uint32_t timeoutTimerId = 0;
 bool nfc_debug_enabled = true;
+static bool sIsForceFwDownloadReqd = false;
 
 /*  Used to send Callback Transceive data during Mifare Write.
  *  If this flag is enabled, no need to send response to Upper layer */
@@ -347,13 +348,12 @@ static NFCSTATUS phNxpNciHal_fw_download(void) {
       continue;
     }
 
-    if (nxpncihal_ctrl.bIsForceFwDwnld) {
+    if (sIsForceFwDownloadReqd) {
       status = phNxpNciHal_getChipInfoInFwDnldMode();
       if (status != NFCSTATUS_SUCCESS) {
         NXPLOG_NCIHAL_E("Unknown chip type, FW can't be upgraded");
         return status;
       }
-      nxpncihal_ctrl.bIsForceFwDwnld = false;
     }
 
     /* Set the obtained device handle to download module */
@@ -362,6 +362,7 @@ static NFCSTATUS phNxpNciHal_fw_download(void) {
     status = phNxpNciHal_fw_download_seq(nxpprofile_ctrl.bClkSrcVal,
                                          nxpprofile_ctrl.bClkFreqVal);
     if (status != NFCSTATUS_SUCCESS) {
+      phDnldNfc_ReSetHwDevHandle();
       fw_retry_count++;
       NXPLOG_NCIHAL_D("Retrying: FW download");
     }
@@ -425,14 +426,12 @@ static NFCSTATUS phNxpNciHal_CheckValidFwVersion(void) {
   unsigned char ufw_current_major_no = 0x00;
   unsigned long num = 0;
   int isfound = 0;
+  unsigned char fw_major_no = ((wFwVerRsp >> 8) & 0x000000FF);
 
   /* extract the firmware's major no */
   ufw_current_major_no = ((0x00FF) & (wFwVer >> 8U));
 
-  if ((ufw_current_major_no == nfcFL._FW_MOBILE_MAJOR_NUMBER) ||
-      ((ufw_current_major_no == FW_MOBILE_MAJOR_NUMBER_PN81A) &&
-        (nxpncihal_ctrl.nci_info.nci_version == NCI_VERSION_2_0)))
-  {
+  if (ufw_current_major_no >= fw_major_no) {
     status = NFCSTATUS_SUCCESS;
   } else if (ufw_current_major_no == sfw_infra_major_no) {
     if (rom_version == FW_MOBILE_ROM_VERSION_PN553 &&
@@ -555,7 +554,6 @@ int phNxpNciHal_MinOpen (){
   const uint16_t max_len = 260;
   NFCSTATUS wConfigStatus = NFCSTATUS_SUCCESS;
   NFCSTATUS status = NFCSTATUS_SUCCESS;
-  nxpncihal_ctrl.bIsForceFwDwnld = false;
   NXPLOG_NCIHAL_D("phNxpNci_MinOpen(): enter");
   /*NCI_INIT_CMD*/
   static uint8_t cmd_init_nci[] = {0x20, 0x01, 0x00};
@@ -668,10 +666,20 @@ int phNxpNciHal_MinOpen (){
 
 init_retry:
   status = phNxpNciHal_send_ext_cmd(sizeof(cmd_reset_nci), cmd_reset_nci);
-  if ((status != NFCSTATUS_SUCCESS) &&
-      (nxpncihal_ctrl.retry_cnt >= MAX_RETRY_COUNT)) {
+  if (status == NFCSTATUS_SUCCESS) {
+    sIsForceFwDownloadReqd = false;
+  } else if (sIsForceFwDownloadReqd) {
+    /* MinOpen can be called from either NFC on or any NFC IOCTL calls from
+     * SPI HAL or system/nfc while Minopen is not done/success, which can
+     * trigger Force FW update during every Minopen. To avoid multiple Force
+     * Force FW upadted return if Force FW update is already done */
+    NXPLOG_NCIHAL_E("%s: Failed after Force FW updated. Exit", __func__);
+    return NFCSTATUS_FAILED;
+  }
+  sIsForceFwDownloadReqd = (status != NFCSTATUS_SUCCESS) &&
+      (nxpncihal_ctrl.retry_cnt >= MAX_RETRY_COUNT);
+  if (sIsForceFwDownloadReqd) {
     NXPLOG_NCIHAL_E("Force FW Download, NFCC not coming out from Standby");
-    nxpncihal_ctrl.bIsForceFwDwnld = true;
     wConfigStatus = NFCSTATUS_FAILED;
     goto force_download;
   } else if (status != NFCSTATUS_SUCCESS) {
@@ -734,8 +742,8 @@ force_download:
     status = phNxpNciHal_fw_download();
     if (NFCSTATUS_FAILED == status){
       wConfigStatus = NFCSTATUS_FAILED;
-      goto clean_and_return;
       NXPLOG_NCIHAL_D("FW download Failed");
+      goto clean_and_return;
     } else if (NFCSTATUS_REJECTED == status) {
       wConfigStatus = NFCSTATUS_SUCCESS;
       NXPLOG_NCIHAL_D("FW download Rejected. Continuiing Nfc Init");
