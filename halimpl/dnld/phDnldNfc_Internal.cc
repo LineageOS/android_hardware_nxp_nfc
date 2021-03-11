@@ -678,7 +678,7 @@ static NFCSTATUS phDnldNfc_BuildFramePkt(pphDnldNfc_DlContext_t pDlContext) {
 *******************************************************************************/
 static NFCSTATUS phDnldNfc_CreateFramePld(pphDnldNfc_DlContext_t pDlContext) {
   NFCSTATUS wStatus = NFCSTATUS_SUCCESS;
-  uint16_t wBuffIdx = 0;
+  uint32_t wBuffIdx = 0;
   uint16_t wChkIntgVal = 0;
   uint16_t wFrameLen = 0;
 
@@ -770,7 +770,7 @@ static NFCSTATUS phDnldNfc_CreateFramePld(pphDnldNfc_DlContext_t pDlContext) {
              &(pDlContext->tRWInfo.wBytesToSendRecv),
              (sizeof(pDlContext->tRWInfo.wBytesToSendRecv)));
 
-      wBuffIdx += sizeof(pDlContext->tRWInfo.wBytesToSendRecv);
+      wBuffIdx += (uint32_t)sizeof(pDlContext->tRWInfo.wBytesToSendRecv);
 
       memcpy(&(pDlContext->tCmdRspFrameInfo.aFrameBuff[wBuffIdx]),
              &(pDlContext->tRWInfo.dwAddr), sizeof(pDlContext->tRWInfo.dwAddr));
