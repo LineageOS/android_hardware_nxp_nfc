@@ -597,13 +597,6 @@ static void phNxpNciHal_fw_dnld_get_version_cb(void* pContext, NFCSTATUS status,
         (gphNxpNciHal_fw_IoctlCtx.bForceDnld) = TRUE;
 #endif
 
-      }
-      /* Minor Version number check - after download
-       * after download, we should get the same version information.*/
-      else if ((TRUE == (gphNxpNciHal_fw_IoctlCtx.bDnldInitiated)) &&
-               ((bNewVer[0] != bCurrVer[0]) || (bNewVer[1] != bCurrVer[1]))) {
-        NXPLOG_FWDNLD_E("Version Not Updated After Download!!\n");
-        wStatus = NFCSTATUS_FAILED;
       } else {
         NXPLOG_FWDNLD_D("Version Check Successful\n");
         /* Store the Mw & Fw Version for updating in EEPROM Log Area after
@@ -928,6 +921,9 @@ static void phNxpNciHal_fw_dnld_write_cb(void* pContext, NFCSTATUS status,
   if (NFCSTATUS_SUCCESS == status) {
     NXPLOG_FWDNLD_D("phNxpNciHal_fw_dnld_write_cb - Request Successful");
     (gphNxpNciHal_fw_IoctlCtx.bDnldEepromWrite) = false;
+    NXPLOG_FWDNLD_E(
+        "Do VEN reset before checking session state after Download success");
+    phTmlNfc_IoCtl(phTmlNfc_e_EnableDownloadMode);
     if ((gphNxpNciHal_fw_IoctlCtx.bDnldInitiated) == true) {
       (gphNxpNciHal_fw_IoctlCtx.tLogParams.wNumDnldSuccess) += 1;
 
@@ -1566,6 +1562,7 @@ static NFCSTATUS phNxpNciHal_fw_dnld_complete(void* pContext, NFCSTATUS status,
     }
     status = phNxpNciHal_fw_dnld_complete(pContext, wStatus, &pInfo);
     if (NFCSTATUS_SUCCESS == status) {
+      wStatus = NFCSTATUS_SUCCESS;
       NXPLOG_FWDNLD_D(" phNxpNciHal_fw_dnld_complete : SUCCESS");
     } else {
       NXPLOG_FWDNLD_E(" phNxpNciHal_fw_dnld_complete : FAILED");
