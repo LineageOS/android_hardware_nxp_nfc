@@ -43,18 +43,23 @@ int NxpMfcReader::Write(uint16_t mfcDataLen, const uint8_t* pMfcData) {
   uint16_t mfcTagCmdBuffLen = 0;
   uint8_t mfcTagCmdBuff[MAX_MFC_BUFF_SIZE] = {0};
 
+  if (mfcDataLen > MAX_MFC_BUFF_SIZE) {
+    android_errorWriteLog(0x534e4554, "169259605");
+    mfcDataLen = MAX_MFC_BUFF_SIZE;
+  }
+
   memcpy(mfcTagCmdBuff, pMfcData, mfcDataLen);
   if (mfcDataLen >= 3) mfcTagCmdBuffLen = mfcDataLen - NCI_HEADER_SIZE;
   BuildMfcCmd(&mfcTagCmdBuff[3], &mfcTagCmdBuffLen);
 
   mfcTagCmdBuff[2] = mfcTagCmdBuffLen;
-  mfcDataLen = mfcTagCmdBuffLen + NCI_HEADER_SIZE;
-  int writtenDataLen = phNxpNciHal_write_internal(mfcDataLen, mfcTagCmdBuff);
+  int writtenDataLen = phNxpNciHal_write_internal(
+      mfcTagCmdBuffLen + NCI_HEADER_SIZE, mfcTagCmdBuff);
 
   /* send TAG_CMD part 2 for Mifare increment ,decrement and restore commands */
   if (mfcTagCmdBuff[4] == eMifareDec || mfcTagCmdBuff[4] == eMifareInc ||
       mfcTagCmdBuff[4] == eMifareRestore) {
-    SendIncDecRestoreCmdPart2(pMfcData);
+    SendIncDecRestoreCmdPart2(mfcDataLen, pMfcData);
   }
   return writtenDataLen;
 }
@@ -262,7 +267,8 @@ void NxpMfcReader::AuthForWrite() {
 ** Returns          None
 **
 *******************************************************************************/
-void NxpMfcReader::SendIncDecRestoreCmdPart2(const uint8_t* mfcData) {
+void NxpMfcReader::SendIncDecRestoreCmdPart2(uint16_t mfcDataLen,
+                                             const uint8_t* mfcData) {
   NFCSTATUS status = NFCSTATUS_SUCCESS;
   /* Build TAG_CMD part 2 for Mifare increment ,decrement and restore commands*/
   uint8_t incDecRestorePart2[] = {0x00, 0x00, 0x05, (uint8_t)eMfRawDataXchgHdr,
@@ -270,6 +276,10 @@ void NxpMfcReader::SendIncDecRestoreCmdPart2(const uint8_t* mfcData) {
   uint8_t incDecRestorePart2Size =
       (sizeof(incDecRestorePart2) / sizeof(incDecRestorePart2[0]));
   if (mfcData[3] == eMifareInc || mfcData[3] == eMifareDec) {
+    if (incDecRestorePart2Size >= mfcDataLen) {
+      incDecRestorePart2Size = mfcDataLen - 1;
+      android_errorWriteLog(0x534e4554, "238177877");
+    }
     for (int i = 4; i < incDecRestorePart2Size; i++) {
       incDecRestorePart2[i] = mfcData[i + 1];
     }
