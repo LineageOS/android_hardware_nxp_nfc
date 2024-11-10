@@ -88,6 +88,7 @@ cc_library_shared {
         "halimpl/mifare/NxpMfcReader.cc",
         "halimpl/recovery/phNxpNciHal_Recovery.cc",
         "halimpl/hal/phNxpNciHal_PowerTrackerIface.cc",
+        "halimpl/hal/phNxpNciHal_WiredSeIface.cc",
     ],
 
     local_include_dirs: [
@@ -144,6 +145,7 @@ cc_library_headers {
         "halimpl/mifare",
         "extns/impl/nxpnfc/2.0",
         "halimpl/recovery",
+        "halimpl/observe_mode",
     ],
 }
 

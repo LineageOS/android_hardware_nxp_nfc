@@ -26,6 +26,10 @@
 #define SWITCH_OFF_MASK 0x02
 #define NCI_GET_CONFI_MIN_LEN 0x04
 #define NXP_MAX_RETRY_COUNT 0x03
+typedef enum {
+  CONFIG,
+  API,
+} tNFC_requestedBy;
 typedef struct {
   uint8_t autonomous_mode;
   uint8_t guard_timer_value;
@@ -246,3 +250,15 @@ void phNxpNciHal_vendorSpecificCallback(int oid, int opcode,
 ** Returns          bool: true if supported, otherwise false
 *******************************************************************************/
 bool phNxpNciHal_isObserveModeSupported();
+
+/*******************************************************************************
+ *
+ * Function         handleGetCapability()
+ *
+ * Description      Get Capability command is not supported, hence returning
+ *                  failure
+ *
+ * Returns          It returns number of bytes received.
+ *
+ ******************************************************************************/
+int handleGetCapability(uint16_t data_len, const uint8_t* p_data);

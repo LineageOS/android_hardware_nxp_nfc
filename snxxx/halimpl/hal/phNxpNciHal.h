@@ -55,6 +55,7 @@ typedef void(phNxpNciHal_control_granted_callback_t)();
 #define UICC1_ID 0x02
 #define UICC2_ID 0x04
 #define UICC3_ID 0x08
+#define ENABLE_T4T_CE 0x03
 /* NCI Data */
 
 //#define NCI_MT_CMD 0x20
@@ -82,6 +83,9 @@ typedef void(phNxpNciHal_control_granted_callback_t)();
 #define NXP_CORE_SET_CONFIG_CMD 0x02
 #define NXP_MAX_CONFIG_STRING_LEN 260
 #define NCI_HEADER_SIZE 3
+
+#define NXP_PHONE_OFF_NFC_OFF_CE_NOT_SUPPORTED 0x00
+#define NXP_PHONE_OFF_NFC_OFF_T4T_CE_SUPPORTED 0x03
 
 #define CORE_RESET_NTF_RECOVERY_REQ_COUNT 0x03
 
