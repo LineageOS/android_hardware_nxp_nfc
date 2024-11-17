@@ -108,8 +108,8 @@ void NciDiscoveryCommandBuilder::removeListenParams() {
  *
  ****************************************************************************/
 void NciDiscoveryCommandBuilder::addObserveModeParams() {
-  mRfDiscoverConfiguration.push_back(
-      DiscoveryConfiguration(OBSERVE_MODE, OBSERVE_MODE_DISCOVERY_CYCLE));
+  mRfDiscoverConfiguration.push_back(DiscoveryConfiguration(
+      OBSERVE_MODE_RF_TECH_AND_MODE, OBSERVE_MODE_DISCOVERY_CYCLE));
 }
 
 /*****************************************************************************
