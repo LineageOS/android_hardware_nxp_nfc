@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2024 NXP
+ * Copyright 2012-2025 NXP
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1150,12 +1150,16 @@ int phNxpNciHal_write(uint16_t data_len, const uint8_t* p_data) {
     phNxpNciHal_print_packet("SEND", p_data, data_len,
                              RfFwRegionDnld_handle == NULL);
     return phNxpNciHal_handleVendorSpecificCommand(data_len, p_data);
-  } else if (isObserveModeEnabled() &&
-             p_data[NCI_GID_INDEX] == NCI_RF_DISC_COMMD_GID &&
+  } else if (p_data[NCI_GID_INDEX] == NCI_RF_DISC_COMMD_GID &&
              p_data[NCI_OID_INDEX] == NCI_RF_DISC_COMMAND_OID) {
-    NciDiscoveryCommandBuilder builder;
-    vector<uint8_t> v_data = builder.reConfigRFDiscCmd(data_len, p_data);
-    return phNxpNciHal_write_internal(v_data.size(), v_data.data());
+    NciDiscoveryCommandBuilderInstance.setDiscoveryCommand(data_len, p_data);
+    if (isObserveModeEnabled()) {
+      vector<uint8_t> v_data =
+          NciDiscoveryCommandBuilderInstance.reConfigRFDiscCmd();
+      return phNxpNciHal_write_internal(v_data.size(), v_data.data());
+    } else {
+      return phNxpNciHal_write_internal(data_len, p_data);
+    }
   } else if (IS_HCI_PACKET(p_data)) {
     // Inform WiredSe service that HCI Pkt is sending from libnfc layer
     phNxpNciHal_WiredSeDispatchEvent(&gWiredSeHandle, SENDING_HCI_PKT);
@@ -1310,8 +1314,6 @@ retry:
     if (nxpncihal_ctrl.retry_cnt++ < MAX_RETRY_COUNT) {
       NXPLOG_NCIHAL_D(
           "write_unlocked failed - NFCC Maybe in Standby Mode - Retry");
-      /* 10ms delay to give NFCC wake up delay */
-      usleep(1000 * 10);
       goto retry;
     } else {
       NXPLOG_NCIHAL_E(
