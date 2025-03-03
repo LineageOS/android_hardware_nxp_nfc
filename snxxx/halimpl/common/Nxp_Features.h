@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  Copyright 2022-2024 NXP
+ *  Copyright 2022-2025 NXP
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -318,6 +318,7 @@ extern tNfc_featureList nfcFL;
 #define CAP_POLL_FRAME_NTF_ID 0x01
 #define CAP_POWER_SAVING_MODE_ID 0x02
 #define CAP_AUTOTRANSACT_PLF_ID 0x03
+#define OBSERVE_MODE_SUPPORT_WITH_OUT_RF 0x02
 
 #define UPDATE_NFCC_CAPABILITY()                                             \
   {                                                                          \
@@ -338,7 +339,7 @@ extern tNfc_featureList nfcFL;
         GetNxpNumValue(NAME_NXP_EXTENDED_FIELD_DETECT_MODE,                  \
                        &extended_field_mode, sizeof(extended_field_mode))) { \
       if (extended_field_mode == 0x03) {                                     \
-        nfcFL.nfccCap.OBSERVE_MODE.val = 0x01;                               \
+        nfcFL.nfccCap.OBSERVE_MODE.val = OBSERVE_MODE_SUPPORT_WITH_OUT_RF;   \
       }                                                                      \
     }                                                                        \
     unsigned long num = 0;                                                   \

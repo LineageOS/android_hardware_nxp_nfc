@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 NXP
+ * Copyright 2024-2025 NXP
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@
 #include <vector>
 
 using namespace std;
+
+#define NciDiscoveryCommandBuilderInstance \
+  (NciDiscoveryCommandBuilder::getInstance())
 
 /**
  * @brief DiscoveryConfiguration is the data class
@@ -40,6 +43,7 @@ class DiscoveryConfiguration {
  */
 class NciDiscoveryCommandBuilder {
  private:
+  vector<uint8_t> currentDiscoveryCommand;
   vector<DiscoveryConfiguration> mRfDiscoverConfiguration;
 
   /*****************************************************************************
@@ -113,6 +117,30 @@ class NciDiscoveryCommandBuilder {
  public:
   /*****************************************************************************
    *
+   * Function         setDiscoveryCommand
+   *
+   * Description      It sets the current discovery command
+   *
+   * Parameters       data - RF discovery command
+   *
+   * Returns          return void
+   *
+   ****************************************************************************/
+  void setDiscoveryCommand(uint16_t data_len, const uint8_t* p_data);
+
+  /*****************************************************************************
+   *
+   * Function         getDiscoveryCommand
+   *
+   * Description      It returns the current discovery command
+   *
+   * Returns          return current discovery command which is set
+   *
+   ****************************************************************************/
+  vector<uint8_t> getDiscoveryCommand();
+
+  /*****************************************************************************
+   *
    * Function         reConfigRFDiscCmd
    *
    * Description      It parse the discovery command and alter the configuration
@@ -123,5 +151,6 @@ class NciDiscoveryCommandBuilder {
    * Returns          return the discovery command for Observe mode
    *
    ****************************************************************************/
-  vector<uint8_t> reConfigRFDiscCmd(uint16_t data_len, const uint8_t* p_data);
+  vector<uint8_t> reConfigRFDiscCmd();
+  static NciDiscoveryCommandBuilder& getInstance();
 };
