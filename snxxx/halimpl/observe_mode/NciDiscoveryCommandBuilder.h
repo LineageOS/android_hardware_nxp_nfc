@@ -43,8 +43,10 @@ class DiscoveryConfiguration {
  */
 class NciDiscoveryCommandBuilder {
  private:
+  uint8_t currentObserveModeTech = 0x00;
   vector<uint8_t> currentDiscoveryCommand;
   vector<DiscoveryConfiguration> mRfDiscoverConfiguration;
+  bool mIsRfDiscoveriryReceived;
 
   /*****************************************************************************
    *
@@ -152,5 +154,53 @@ class NciDiscoveryCommandBuilder {
    *
    ****************************************************************************/
   vector<uint8_t> reConfigRFDiscCmd();
+
+  /*****************************************************************************
+   *
+   * Function         setObserveModePerTech
+   *
+   * Description      Sets ObserveMode tech mode
+   *
+   * Parameters       techMode - ObserveMode tech mode
+   *
+   * Returns          return void
+   *
+   ****************************************************************************/
+  void setObserveModePerTech(uint8_t techMode);
+
+  /*****************************************************************************
+   *
+   * Function         getCurrentObserveModeTechValue
+   *
+   * Description      gets Current ObserveMode per tech
+   *
+   * Returns          return Current Observe mode tech
+   *
+   ****************************************************************************/
+  uint8_t getCurrentObserveModeTechValue();
+
+  /*****************************************************************************
+   *
+   * Function         setRfDiscoveryReceived
+   *
+   * Description      Set flags when it receives discovery command received,
+   *                  set to false during nfc init begin
+   *
+   * Returns          return void
+   *
+   ****************************************************************************/
+  void setRfDiscoveryReceived(bool flag);
+
+  /*****************************************************************************
+   *
+   * Function         isRfDiscoveryCommandReceived
+   *
+   * Description      returns true if discovery command set otherwise false
+   *
+   * Returns          return bool
+   *
+   ****************************************************************************/
+  bool isRfDiscoveryCommandReceived();
+
   static NciDiscoveryCommandBuilder& getInstance();
 };

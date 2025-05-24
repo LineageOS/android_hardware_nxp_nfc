@@ -69,6 +69,10 @@ int handleObserveMode(uint16_t data_len, const uint8_t* p_data) {
   uint8_t status = NCI_RSP_FAIL;
   if (phNxpNciHal_isObserveModeSupported()) {
     setObserveModeFlag(p_data[NCI_MSG_INDEX_FEATURE_VALUE]);
+    // ObserveMode per tech will be set to 0x01/0x00 for observe mode old
+    // command
+    NciDiscoveryCommandBuilderInstance.setObserveModePerTech(
+        p_data[NCI_MSG_INDEX_FEATURE_VALUE]);
     status = NCI_RSP_OK;
   }
 
@@ -76,6 +80,51 @@ int handleObserveMode(uint16_t data_len, const uint8_t* p_data) {
       p_data[NCI_OID_INDEX], p_data[NCI_MSG_INDEX_FOR_FEATURE], {status});
 
   return p_data[NCI_MSG_LEN_INDEX];
+}
+
+/*******************************************************************************
+ *
+ * Function         deactivateRfDiscovery()
+ *
+ * Description      sends RF deactivate command
+ *
+ * Returns          It returns Rf deactivate status
+ *
+ ******************************************************************************/
+NFCSTATUS deactivateRfDiscovery() {
+  if (NciDiscoveryCommandBuilderInstance.isRfDiscoveryCommandReceived()) {
+    uint8_t rf_deactivate_cmd[] = {0x21, 0x06, 0x01, 0x00};
+    return phNxpNciHal_send_ext_cmd(sizeof(rf_deactivate_cmd),
+                                    rf_deactivate_cmd);
+  } else {
+    return NFCSTATUS_SUCCESS;
+  }
+}
+
+/*******************************************************************************
+ *
+ * Function         sendRfDiscoveryCommand()
+ *
+ * Description      sends RF discovery command
+ *
+ * Parameters       isObserveModeEnable
+ *                      - true to send discovery with field detect mode
+ *                      - false to send default discovery command
+ *
+ * Returns          It returns Rf deactivate status
+ *
+ ******************************************************************************/
+NFCSTATUS sendRfDiscoveryCommand(bool isObserveModeEnable) {
+  if (NciDiscoveryCommandBuilderInstance.isRfDiscoveryCommandReceived()) {
+    vector<uint8_t> discoveryCommand =
+        isObserveModeEnable
+            ? NciDiscoveryCommandBuilderInstance.reConfigRFDiscCmd()
+            : NciDiscoveryCommandBuilderInstance.getDiscoveryCommand();
+    return phNxpNciHal_send_ext_cmd(discoveryCommand.size(),
+                                    &discoveryCommand[0]);
+  } else {
+    return NFCSTATUS_SUCCESS;
+  }
 }
 
 /*******************************************************************************
@@ -89,49 +138,56 @@ int handleObserveMode(uint16_t data_len, const uint8_t* p_data) {
  *
  ******************************************************************************/
 int handleObserveModeTechCommand(uint16_t data_len, const uint8_t* p_data) {
+  NFCSTATUS nciStatus = NFCSTATUS_FAILED;
   uint8_t status = NCI_RSP_FAIL;
+  uint8_t techValue = p_data[NCI_MSG_INDEX_FEATURE_VALUE];
   if (phNxpNciHal_isObserveModeSupported() &&
-      (p_data[NCI_MSG_INDEX_FEATURE_VALUE] ==
-           OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG ||
-       p_data[NCI_MSG_INDEX_FEATURE_VALUE] ==
-           OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG_FOR_ALL_TECH ||
-       p_data[NCI_MSG_INDEX_FEATURE_VALUE] ==
-           NCI_ANDROID_PASSIVE_OBSERVE_PARAM_DISABLE)) {
-    bool flag = (p_data[NCI_MSG_INDEX_FEATURE_VALUE] ==
-                     OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG ||
-                 p_data[NCI_MSG_INDEX_FEATURE_VALUE] ==
-                     OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG_FOR_ALL_TECH)
-                    ? true
-                    : false;
-    uint8_t rf_deactivate_cmd[] = {0x21, 0x06, 0x01, 0x00};
-
+      (techValue == OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG ||
+       techValue == OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG_FOR_ALL_TECH ||
+       techValue == NCI_ANDROID_PASSIVE_OBSERVE_PARAM_DISABLE)) {
+    bool flag =
+        (techValue == OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG ||
+         techValue == OBSERVE_MODE_TECH_COMMAND_SUPPORT_FLAG_FOR_ALL_TECH)
+            ? true
+            : false;
     // send RF Deactivate command
-    NFCSTATUS rfDeactivateStatus =
-        phNxpNciHal_send_ext_cmd(sizeof(rf_deactivate_cmd), rf_deactivate_cmd);
-    if (rfDeactivateStatus == NFCSTATUS_SUCCESS) {
-      if (flag) {
+    nciStatus = deactivateRfDiscovery();
+    if (nciStatus == NFCSTATUS_SUCCESS) {
+      if (flag && techValue != NciDiscoveryCommandBuilderInstance
+                                   .getCurrentObserveModeTechValue()) {
         // send Observe Mode Tech command
-        NFCSTATUS nciStatus =
-            phNxpNciHal_send_ext_cmd(data_len, (uint8_t*)p_data);
+        NciDiscoveryCommandBuilderInstance.setObserveModePerTech(techValue);
+
+        nciStatus = phNxpNciHal_send_ext_cmd(data_len, (uint8_t*)p_data);
         if (nciStatus != NFCSTATUS_SUCCESS) {
           NXPLOG_NCIHAL_E("%s ObserveMode tech command failed", __func__);
         }
       }
 
-      // send Discovery command
-      vector<uint8_t> discoveryCommand =
-          flag ? NciDiscoveryCommandBuilderInstance.reConfigRFDiscCmd()
-               : NciDiscoveryCommandBuilderInstance.getDiscoveryCommand();
-      NFCSTATUS rfDiscoveryStatus = phNxpNciHal_send_ext_cmd(
-          discoveryCommand.size(), &discoveryCommand[0]);
+      // Send RF Discovery command
+      NFCSTATUS rfDiscoveryStatus =
+          sendRfDiscoveryCommand(nciStatus == NFCSTATUS_SUCCESS ? flag : false);
 
-      if (rfDiscoveryStatus == NFCSTATUS_SUCCESS) {
+      if (rfDiscoveryStatus == NFCSTATUS_SUCCESS &&
+          nciStatus == NFCSTATUS_SUCCESS) {
         setObserveModeFlag(flag);
         status = NCI_RSP_OK;
-      } else {
-        NXPLOG_NCIHAL_E("%s Rf Disovery command failed", __func__);
+      } else if (rfDiscoveryStatus != NFCSTATUS_SUCCESS) {
+        NXPLOG_NCIHAL_E(
+            "%s Rf Disovery command failed, reset back to default discovery",
+            __func__);
+        // Recovery to fallback to default discovery when there is a failure
+        nciStatus = deactivateRfDiscovery();
+        if (nciStatus != NFCSTATUS_SUCCESS) {
+          NXPLOG_NCIHAL_E("%s Rf Deactivate command failed on recovery",
+                          __func__);
+        }
+        rfDiscoveryStatus = sendRfDiscoveryCommand(false);
+        if (rfDiscoveryStatus != NFCSTATUS_SUCCESS) {
+          NXPLOG_NCIHAL_E("%s Rf Disovery command failed on recovery",
+                          __func__);
+        }
       }
-
     } else {
       NXPLOG_NCIHAL_E("%s Rf Deactivate command failed", __func__);
     }
@@ -163,8 +219,11 @@ int handleGetObserveModeStatus(uint16_t data_len, const uint8_t* p_data) {
     return 0;
   }
   vector<uint8_t> response;
-  response.push_back(NCI_RSP_OK);
-  response.push_back(isObserveModeEnabled() ? 0x01 : 0x00);
+  response.push_back(0x00);
+  response.push_back(
+      isObserveModeEnabled()
+          ? NciDiscoveryCommandBuilderInstance.getCurrentObserveModeTechValue()
+          : 0x00);
   phNxpNciHal_vendorSpecificCallback(p_data[NCI_OID_INDEX],
                                      p_data[NCI_MSG_INDEX_FOR_FEATURE],
                                      std::move(response));
