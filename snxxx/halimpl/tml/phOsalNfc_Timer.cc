@@ -326,6 +326,10 @@ static void phOsalNfc_DeferredCall(void* pParams) {
   if (NULL != pParams) {
     /* Retrieve the index at which the timer handle structure is stored */
     dwIndex = (uintptr_t)pParams - PH_NFC_TIMER_BASE_ADDRESS - 0x01;
+    if (dwIndex >= PH_NFC_MAX_TIMER) {
+      NXPLOG_TML_E("Invalid timer id!");
+      return;
+    }
     pTimerHandle = (phOsalNfc_TimerHandle_t*)&apTimerInfo[dwIndex];
     if (pTimerHandle->Application_callback != NULL) {
       /* Invoke the callback function with osal Timer ID */
@@ -378,6 +382,10 @@ static void phOsalNfc_Timer_Expired(union sigval sv) {
   phOsalNfc_TimerHandle_t* pTimerHandle;
 
   dwIndex = ((uint32_t)(sv.sival_int)) - PH_NFC_TIMER_BASE_ADDRESS - 0x01;
+  if (dwIndex >= PH_NFC_MAX_TIMER) {
+    NXPLOG_TML_E("Invalid timer id!");
+    return;
+  }
   pTimerHandle = (phOsalNfc_TimerHandle_t*)&apTimerInfo[dwIndex];
   /* Timer is stopped when callback function is invoked */
   pTimerHandle->eState = eTimerStopped;
