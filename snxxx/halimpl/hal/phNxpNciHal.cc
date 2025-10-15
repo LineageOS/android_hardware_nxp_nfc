@@ -16,6 +16,7 @@
 
 #include <EseAdaptation.h>
 #include <android-base/file.h>
+#include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <dlfcn.h>
 #include <log/log.h>
@@ -4119,14 +4120,33 @@ static void phNxpNciHal_UpdateFwStatus(HalNfcFwUpdateStatus fwStatus) {
 void phNxpNciHal_configureLxDebugMode() {
   NFCSTATUS status = NFCSTATUS_SUCCESS;
   unsigned long lx_debug_cfg = 0;
-  uint8_t isfound = 0;
+  unsigned long prop_val = 0;
+  unsigned long config_val = 0;
+  bool prop_found = false;
+  bool config_found = false;
   static uint8_t cmd_lxdebug[] = {0x20, 0x02, 0x06, 0x01, 0xA0,
                                   0x1D, 0x02, 0x00, 0x00};
 
-  isfound = GetNxpNumValue(NAME_NXP_CORE_PROP_SYSTEM_DEBUG, &lx_debug_cfg,
-                           sizeof(lx_debug_cfg));
+  std::string prop_str =
+      android::base::GetProperty("persist.vendor.nfc.nxp.lx_debug_mask", "");
 
-  if (isfound) {
+  if (!prop_str.empty()) {
+    if (sscanf(prop_str.c_str(), "%lx", &prop_val) == 1) {
+      prop_found = true;
+    }
+  }
+
+  config_found = GetNxpNumValue(NAME_NXP_CORE_PROP_SYSTEM_DEBUG, &config_val,
+                                sizeof(config_val));
+
+  if (prop_found) {
+    lx_debug_cfg |= prop_val;
+  }
+  if (config_found) {
+    lx_debug_cfg |= config_val;
+  }
+
+  if (lx_debug_cfg) {
     if (lx_debug_cfg & LX_DEBUG_CFG_MASK_RFU) {
       NXPLOG_NCIHAL_E(
           "One or more RFU bits are enabled.\nMasking the RFU bits");
