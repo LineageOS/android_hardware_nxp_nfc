@@ -18,12 +18,23 @@ aidl_interface {
     owner: "nxp",
     backend: {
         cpp: {
+            // FIXME should this be disabled?
+            // prefer NDK backend which can be used anywhere
+            // If you disable this, you also need to delete the C++
+            // translate code.
             enabled: false,
         },
         java: {
             sdk_version: "module_current",
             enabled: false,
         },
+        ndk: {
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.nfcservices",
+            ],
+        },
+
     },
     versions_with_info: [
         {

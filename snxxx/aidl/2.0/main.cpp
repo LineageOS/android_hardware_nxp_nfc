@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  Copyright 2022 NXP
+ *  Copyright 2022, 2024-2025 NXP
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -26,20 +26,38 @@
 #include "NxpNfc.h"
 #include "phNxpNciHal_Adaptation.h"
 #include "phNxpNciHal_Recovery.h"
+#include "phNxpNciHal_WiredSeIface.h"
 
 using ::aidl::android::hardware::nfc::Nfc;
 using ::aidl::vendor::nxp::nxpnfc_aidl::INxpNfc;
 using ::aidl::vendor::nxp::nxpnfc_aidl::NxpNfc;
 using namespace std;
 
+extern WiredSeHandle* gWiredSeHandle;
+
 void startNxpNfcAidlService() {
   ALOGI("NXP NFC Extn Service is starting.");
+  unsigned long dynamicHal = 0;
+  if (!GetNxpNumValue("NFC_DYNAMIC_HAL", &dynamicHal, sizeof(dynamicHal))) {
+    NXPLOG_NCIHAL_D("NFC_DYNAMIC_HAL not found in config. Using default value");
+  }
+  if (gWiredSeHandle != NULL && dynamicHal == 1) {
+    NXPLOG_NCIHAL_D("WiredSe support is enabled, Force disabling dynamic Hal");
+    dynamicHal = 0;
+  }
   std::shared_ptr<NxpNfc> nxp_nfc_service = ndk::SharedRefBase::make<NxpNfc>();
   const std::string nxpNfcInstName =
       std::string() + NxpNfc::descriptor + "/default";
-  ALOGI("NxpNfc Registering service: %s", nxpNfcInstName.c_str());
-  binder_status_t status = AServiceManager_addService(
-      nxp_nfc_service->asBinder().get(), nxpNfcInstName.c_str());
+  binder_status_t status = STATUS_OK;
+  if (dynamicHal == 1) {
+    ALOGI("NxpNfc Registering Lazy service: %s", nxpNfcInstName.c_str());
+    status = AServiceManager_registerLazyService(
+        nxp_nfc_service->asBinder().get(), nxpNfcInstName.c_str());
+  } else {
+    ALOGI("NxpNfc Registering service: %s", nxpNfcInstName.c_str());
+    status = AServiceManager_addService(nxp_nfc_service->asBinder().get(),
+                                        nxpNfcInstName.c_str());
+  }
   ALOGI("NxpNfc Registered INxpNfc service status: %d", status);
   CHECK(status == STATUS_OK);
   ABinderProcess_joinThreadPool();
@@ -51,11 +69,32 @@ int main() {
     ALOGE("failed to set thread pool max thread count");
     return 1;
   }
+  // Starts Wired SE HAL instance if platform supports
+  gWiredSeHandle = phNxpNciHal_WiredSeStart();
+  if (gWiredSeHandle == NULL) {
+    ALOGE("Wired Se HAL Disabled");
+  }
+  unsigned long dynamicHal = 0;
+  if (!GetNxpNumValue("NFC_DYNAMIC_HAL", &dynamicHal, sizeof(dynamicHal))) {
+    NXPLOG_NCIHAL_D("NFC_DYNAMIC_HAL not found in config. Using default value");
+  }
+  if (gWiredSeHandle != NULL && dynamicHal == 1) {
+    NXPLOG_NCIHAL_D("WiredSe support is enabled, Force disabling dynamic Hal");
+    dynamicHal = 0;
+  }
   std::shared_ptr<Nfc> nfc_service = ndk::SharedRefBase::make<Nfc>();
 
   const std::string nfcInstName = std::string() + Nfc::descriptor + "/default";
-  binder_status_t status = AServiceManager_addService(
-      nfc_service->asBinder().get(), nfcInstName.c_str());
+  binder_status_t status = STATUS_OK;
+  if (dynamicHal == 1) {
+    ALOGI("Nfc Registering Lazy service: %s", nfcInstName.c_str());
+    status = AServiceManager_registerLazyService(nfc_service->asBinder().get(),
+                                                 nfcInstName.c_str());
+  } else {
+    ALOGI("Nfc Registering service: %s", nfcInstName.c_str());
+    status = AServiceManager_addService(nfc_service->asBinder().get(),
+                                        nfcInstName.c_str());
+  }
   CHECK(status == STATUS_OK);
 
 #if (NXP_NFC_RECOVERY == TRUE)
