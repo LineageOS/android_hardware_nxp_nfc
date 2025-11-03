@@ -4263,7 +4263,11 @@ void phNxpNciHal_deinitializeRegRfFwDnld() {
  *
  *****************************************************************************/
 
-void phNxpNciHal_setVerboseLogging(bool enable) { nfc_debug_enabled = enable; }
+void phNxpNciHal_setVerboseLogging(bool enable) {
+  nfc_debug_enabled = enable;
+  android::base::SetProperty("persist.vendor.nfc.nxp.lx_debug_mask",
+                             enable ? "0x2017" : "0x0");
+}
 
 /******************************************************************************
  * Function         phNxpNciHal_getVerboseLogging
