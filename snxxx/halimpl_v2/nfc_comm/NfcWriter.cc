@@ -111,7 +111,7 @@ int NfcWriter::write(uint16_t data_len, const uint8_t* p_data) {
     }
     uint8_t* p_data_mutable = const_cast<uint8_t*>(p_data);
     copy(rfDiscCmd.begin(), rfDiscCmd.end(), p_data_mutable);
-    NFCSTATUS status = phNxpExtn_HandleNciMsg(&data_len, p_data);
+    const NFCSTATUS status = phNxpExtn_HandleNciMsg(&data_len, p_data);
     if (status != NFCSTATUS_EXTN_FEATURE_SUCCESS)
       return this->direct_write(data_len, p_data);
     else
@@ -124,18 +124,18 @@ int NfcWriter::write(uint16_t data_len, const uint8_t* p_data) {
     // that it can close if session is ongoing on same NFCEE
     phNxpNciHal_WiredSeDispatchEvent(
         gWiredSeHandle, DISABLING_NFCEE,
-        createWiredSeEvtData((uint8_t*)p_data, data_len));
+        createWiredSeEvtData(const_cast<uint8_t*>(p_data), data_len));
   } else {
-    NFCSTATUS status = phNxpExtn_HandleNciMsg(&data_len, p_data);
+    const NFCSTATUS status = phNxpExtn_HandleNciMsg(&data_len, p_data);
     NXPLOG_NCIHAL_D("Vendor specific status: %d", status);
     if (status == NFCSTATUS_EXTN_FEATURE_SUCCESS) return data_len;
   }
   long value = 0;
   /* NXP Removal Detection timeout Config */
-  if (GetNxpNumValue(NAME_NXP_REMOVAL_DETECTION_TIMEOUT, (void*)&value,
-                     sizeof(value))) {
+  if (GetNxpNumValue(NAME_NXP_REMOVAL_DETECTION_TIMEOUT,
+                     static_cast<void*>(&value), sizeof(value))) {
     // Change the timeout value as per config file
-    uint8_t* wait_time = (uint8_t*)&p_data[3];
+    uint8_t* wait_time = const_cast<uint8_t*>(&p_data[3]);
     if ((data_len == 0x04) && (p_data[0] == 0x21 && p_data[1] == 0x12)) {
       *wait_time = value;
     }
@@ -202,14 +202,13 @@ clean_and_return:
 int NfcWriter::write_unlocked(uint16_t data_len, const uint8_t* p_data,
                               int origin) {
   NFCSTATUS status = NFCSTATUS_INVALID_PARAMETER;
-  phNxpNciHal_Sem_t cb_data;
   nxpncihal_ctrl.retry_cnt = 0;
   int sem_val = 0;
   write_unlocked_status = NFCSTATUS_FAILED;
   static phLibNfc_Message_t msg;
 
   /* check for write synchronization */
-  if (this->check_ncicmd_write_window(data_len, (uint8_t*)p_data) !=
+  if (this->check_ncicmd_write_window(data_len, const_cast<uint8_t*>(p_data)) !=
       NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_D("NfcWriter::write_unlocked  CMD window  check failed");
     data_len = 0;
@@ -218,7 +217,7 @@ int NfcWriter::write_unlocked(uint16_t data_len, const uint8_t* p_data,
 
   /* Check for NXP ext before sending write */
   status =
-      phNxpNciHal_write_ext(&data_len, (uint8_t*)p_data,
+      phNxpNciHal_write_ext(&data_len, const_cast<uint8_t*>(p_data),
                             &nxpncihal_ctrl.rsp_len, nxpncihal_ctrl.p_rsp_data);
   if (status != NFCSTATUS_SUCCESS) {
     /* Do not send packet to NFCC, send response directly */
@@ -226,59 +225,43 @@ int NfcWriter::write_unlocked(uint16_t data_len, const uint8_t* p_data,
     msg.pMsgData = NULL;
     msg.Size = 0;
 
-    phTmlNfc_DeferredCall(gpphTmlNfc_Context->dwCallbackThreadId,
-                          (phLibNfc_Message_t*)&msg);
+    phTmlNfc_DeferredCall(gpphTmlNfc_Context->dwCallbackThreadId, &msg);
     NXPLOG_NCIHAL_E("NXP ext check failed 0x%x", status);
     goto clean_and_return;
   }
 
   if (origin == ORIG_NXPHAL) HAL_ENABLE_EXT();
 
-  do {
-    if (!phNxpTempMgr::GetInstance().IsICTempOk()) {
-      phNxpTempMgr::GetInstance().Wait();
+  if (!phNxpTempMgr::GetInstance().IsICTempOk()) {
+    phNxpTempMgr::GetInstance().Wait();
+  }
+
+  status = phTmlNfc_Write(const_cast<uint8_t*>(p_data), data_len);
+  if (status == NFCSTATUS_SUCCESS) {
+    if (origin == ORIG_EXTNS &&
+        p_data[NCI_GID_INDEX] == NCI_RF_DISC_COMMD_GID &&
+        p_data[NCI_OID_INDEX] == NCI_RF_DISC_COMMAND_OID && data_len > 2 &&
+        p_data[data_len - 2] != 0xFF && p_data[data_len - 1] != 0x01) {
+      NciDiscoveryCommandBuilderInstance.setDiscoveryCommand(data_len, p_data);
     }
-
-    status = phTmlNfc_Write((uint8_t*)p_data, (uint16_t)data_len);
-    if (status == NFCSTATUS_SUCCESS) {
-      if (origin == ORIG_EXTNS &&
-          p_data[NCI_GID_INDEX] == NCI_RF_DISC_COMMD_GID &&
-          p_data[NCI_OID_INDEX] == NCI_RF_DISC_COMMAND_OID && data_len > 2 &&
-          p_data[data_len - 2] != 0xFF && p_data[data_len - 1] != 0x01) {
-        NciDiscoveryCommandBuilderInstance.setDiscoveryCommand(data_len,
-                                                               p_data);
-      }
-      write_unlocked_status = NFCSTATUS_SUCCESS;
-      break;
-    }
-
-    if (nxpncihal_ctrl.retry_cnt++ < MAX_RETRY_COUNT) {
-      NXPLOG_NCIHAL_D(
-          "write_unlocked failed - NFCC Maybe in Standby Mode - Retry");
-    } else {
-      data_len = 0;
-      NXPLOG_NCIHAL_E(
-          "write_unlocked failed - NFCC Maybe in Standby Mode (max count = "
-          "0x%x)",
-          nxpncihal_ctrl.retry_cnt);
-
-      status = phTmlNfc_IoCtl(phTmlNfc_e_ResetDevice);
-
-      if (NFCSTATUS_SUCCESS == status) {
-        NXPLOG_NCIHAL_D("NFCC Reset - SUCCESS\n");
-      } else {
-        NXPLOG_NCIHAL_D("NFCC Reset - FAILED\n");
-      }
-      if (nxpncihal_ctrl.p_nfc_stack_data_cback != NULL &&
-          nxpncihal_ctrl.halStatus != HAL_STATUS_CLOSE) {
-        NXPLOG_NCIHAL_D("Doing abort which will trigger the recovery\n");
-        // abort which will trigger the recovery.
-        phNxpExtn_HandleHalEvent(NFCC_HAL_FATAL_ERR_CODE);
-        abort();
-      }
-      break;
-    }
-  } while (true);
+    write_unlocked_status = NFCSTATUS_SUCCESS;
+    goto clean_and_return;
+  }
+  data_len = 0;
+  NXPLOG_NCIHAL_E("write_unlocked failed");
+  status = phTmlNfc_IoCtl(phTmlNfc_e_ResetDevice);
+  if (NFCSTATUS_SUCCESS == status) {
+    NXPLOG_NCIHAL_D("NFCC Reset - SUCCESS\n");
+  } else {
+    NXPLOG_NCIHAL_D("NFCC Reset - FAILED\n");
+  }
+  if (nxpncihal_ctrl.p_nfc_stack_data_cback != NULL &&
+      nxpncihal_ctrl.halStatus != HAL_STATUS_CLOSE) {
+    NXPLOG_NCIHAL_D("Doing abort which will trigger the recovery\n");
+    // abort which will trigger the recovery.
+    phNxpExtn_HandleHalEvent(NFCC_HAL_FATAL_ERR_CODE);
+    abort();
+  }
 
 clean_and_return:
   if (write_unlocked_status == NFCSTATUS_FAILED) {
@@ -304,7 +287,8 @@ clean_and_return:
 
 int NfcWriter::check_ncicmd_write_window(uint16_t cmd_len, uint8_t* p_cmd) {
   NFCSTATUS status = NFCSTATUS_FAILED;
-  int sem_timedout = 2, s;
+  const int sem_timedout = 2;
+  int s;
   struct timespec ts;
 
   if (cmd_len < 1) {
@@ -313,7 +297,9 @@ int NfcWriter::check_ncicmd_write_window(uint16_t cmd_len, uint8_t* p_cmd) {
   }
 
   if ((p_cmd[0] & 0xF0) == 0x20) {
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+      NXPLOG_NCIHAL_E("%s Fail get time; errno=0x%X", __func__, errno);
+    }
     ts.tv_sec += sem_timedout;
     while ((s = sem_timedwait_monotonic_np(&nxpncihal_ctrl.syncSpiNfc, &ts)) ==
                -1 &&

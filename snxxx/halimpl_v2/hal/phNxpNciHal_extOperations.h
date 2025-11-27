@@ -146,7 +146,7 @@ NFCSTATUS phNxpNciHal_setSrdtimeout();
  *
  ******************************************************************************/
 NFCSTATUS
-phNxpNciHal_set_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
+phNxpNciHal_set_uicc_hci_params(std::vector<uint8_t>& ptr, uint8_t bufflen,
                                 phNxpNci_EEPROM_request_type_t uiccType);
 /******************************************************************************
  * Function         phNxpNciHal_get_uicc_hci_params
@@ -161,7 +161,7 @@ phNxpNciHal_set_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
  *
  ******************************************************************************/
 NFCSTATUS
-phNxpNciHal_get_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
+phNxpNciHal_get_uicc_hci_params(std::vector<uint8_t>& ptr, uint8_t bufflen,
                                 phNxpNci_EEPROM_request_type_t uiccType);
 
 /******************************************************************************
@@ -254,7 +254,7 @@ int phNxpNciHal_hndlVndSpecificAndroidCmd(uint16_t data_len,
 **
 *******************************************************************************/
 void phNxpNciHal_vendorSpecificCallback(int oid, int opcode,
-                                        vector<uint8_t> data);
+                                        std::vector<uint8_t> data);
 
 /*******************************************************************************
 **
@@ -278,3 +278,14 @@ bool phNxpNciHal_isObserveModeSupported();
  *
  ******************************************************************************/
 int handleGetCapability(uint16_t data_len, const uint8_t* p_data);
+
+/*******************************************************************************
+ *
+ * Function         handleReaderModeAnnotationCommand()
+ *
+ * Description      Handles reader mode annotation command processing
+ *
+ * Returns          It returns number of bytes received.
+ *
+ ******************************************************************************/
+int handleReaderModeAnnotationCommand(uint16_t data_len, const uint8_t* p_data);

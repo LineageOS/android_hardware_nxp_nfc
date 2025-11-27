@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 NXP
+ * Copyright 2024-2025 NXP
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,16 @@ class phNxpNciHal_ReaderThread {
    ******************************************************************************/
   bool Stop();
 
+  /******************************************************************************
+   * Function:       GetMsgQueue()
+   *
+   * Description:    This method returns the msg Q associated with the reader
+   *                 thread.
+   *
+   * Returns:        intptr_t: Pointer to the msg Q
+   ******************************************************************************/
+  inline intptr_t GetMsgQueue() { return reader_queue; }
+
  private:
   phNxpNciHal_ReaderThread();
   ~phNxpNciHal_ReaderThread();
@@ -57,6 +67,7 @@ class phNxpNciHal_ReaderThread {
   static void* ReaderThread(void* arg);
   void Run();
   pthread_t reader_thread;
+  intptr_t reader_queue;
   volatile std::atomic<bool> thread_running;
 };
 #endif  // NXPNCIHALREADER_H

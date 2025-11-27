@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
+#include <thread>
 #include "NfcExtension.h"
-
 #include <dlfcn.h>
 #include <phNxpLog.h>
 #include <phNxpNciHal.h>
-
-#include <thread>
-
 #include "NfcWriter.h"
 #include "NxpNfcExtension.h"
 #include "phNxpNciHal_WriterThread.h"
@@ -66,36 +63,39 @@ void phNxpExtn_LibSetup() {
     return;
   }
 
-  fp_extn_init =
-      (fp_extn_init_t)dlsym(p_oem_extn_handle, vendor_nfc_init_name.c_str());
+  fp_extn_init = reinterpret_cast<fp_extn_init_t>(
+      dlsym(p_oem_extn_handle, vendor_nfc_init_name.c_str()));
+
   if (fp_extn_init == nullptr) {
     NXPLOG_NCIHAL_E("%s Failed to find %s !!", __func__,
                     vendor_nfc_init_name.c_str());
   }
 
-  fp_extn_deinit = (fp_extn_deinit_t)dlsym(p_oem_extn_handle,
-                                           vendor_nfc_de_init_name.c_str());
+  fp_extn_deinit = reinterpret_cast<fp_extn_deinit_t>(
+      dlsym(p_oem_extn_handle, vendor_nfc_de_init_name.c_str()));
+
   if (fp_extn_deinit == nullptr) {
     NXPLOG_NCIHAL_E("%s Failed to find %s !!", __func__,
                     vendor_nfc_de_init_name.c_str());
   }
 
-  fp_extn_handle_nfc_event = (fp_extn_handle_nfc_event_t)dlsym(
-      p_oem_extn_handle, vendor_nfc_handle_event_name.c_str());
+  fp_extn_handle_nfc_event = reinterpret_cast<fp_extn_handle_nfc_event_t>(
+      dlsym(p_oem_extn_handle, vendor_nfc_handle_event_name.c_str()));
+
   if (fp_extn_handle_nfc_event == nullptr) {
     NXPLOG_NCIHAL_E("%s Failed to find %s !!", __func__,
                     vendor_nfc_handle_event_name.c_str());
   }
   // Allocate Transaction buffers
   nciMsgDeferredData.tTransactionInfo.pBuff =
-      (uint8_t*)calloc(NCI_MAX_DATA_LEN, sizeof(uint8_t));
+      static_cast<uint8_t*>(calloc(NCI_MAX_DATA_LEN, sizeof(uint8_t)));
   if (nciMsgDeferredData.tTransactionInfo.pBuff == NULL) {
     NXPLOG_NCIHAL_E("%s Failed to allocate transaction buffer");
     phNxpExtn_LibClose();
     return;
   }
   nciRspNtfDeferredData.tTransactionInfo.pBuff =
-      (uint8_t*)calloc(NCI_MAX_DATA_LEN, sizeof(uint8_t));
+      static_cast<uint8_t*>(calloc(NCI_MAX_DATA_LEN, sizeof(uint8_t)));
   if (nciRspNtfDeferredData.tTransactionInfo.pBuff == NULL) {
     NXPLOG_NCIHAL_E("%s Failed to allocate transaction buffer");
     phNxpExtn_LibClose();
@@ -128,7 +128,7 @@ void phNxpExtn_LibClose() {
   phNxpNfcExtn_deInit();
   if (p_oem_extn_handle != NULL) {
     NXPLOG_NCIHAL_D("%s Closing libnfc_vendor_extn.so lib", __func__);
-    int32_t status = dlclose(p_oem_extn_handle);
+    const int32_t status = dlclose(p_oem_extn_handle);
     dlerror(); /* Clear any existing error */
     if (status != 0) {
       NXPLOG_NCIHAL_E("%s Free libnfc_vendor_extn.so failed", __func__);
@@ -153,7 +153,7 @@ NFCSTATUS phNxpExtn_HandleNciMsg(uint16_t* dataLen, const uint8_t* pData) {
   NXPLOG_NCIHAL_D("%s Enter dataLen:%d", __func__, *dataLen);
   NciData_t nci_data;
   nci_data.data_len = *dataLen;
-  nci_data.p_data = (uint8_t*)pData;
+  nci_data.p_data = const_cast<uint8_t*>(pData);
   nfc_ext_event_data.nci_msg = nci_data;
 
   if (NFCSTATUS_EXTN_FEATURE_SUCCESS ==
@@ -189,7 +189,8 @@ NFCSTATUS phNxpExtn_HandleNciRspNtf(uint16_t* dataLen, const uint8_t* pData) {
   NXPLOG_NCIHAL_D("%s Enter dataLen:%d", __func__, *dataLen);
   NciData_t nci_data;
   nci_data.data_len = *dataLen;
-  nci_data.p_data = (uint8_t*)pData;
+  nci_data.p_data = const_cast<uint8_t*>(pData);
+  ;
   nfc_ext_event_data.nci_rsp_ntf = nci_data;
 
   if (fp_extn_handle_nfc_event != NULL) {
@@ -219,7 +220,7 @@ NfcRfState_t phNxpExtn_NfcGetRfState() {
   if (fp_extn_handle_nfc_event != NULL) {
     fp_extn_handle_nfc_event(HANDLE_RF_HAL_STATE_UPDATE, &nfc_ext_event_data);
   }
-  return (NfcRfState_t)nfc_ext_event_data.rf_state;
+  return static_cast<NfcRfState_t>(nfc_ext_event_data.rf_state);
 }
 
 void phNxpExtn_NfcHalStateUpdate(uint8_t state) {
@@ -281,7 +282,8 @@ void phNxpHal_ReleaseControl() {
 void phNxpHal_NfcDataCallback(uint16_t dataLen, const uint8_t* pData) {
   NXPLOG_NCIHAL_D("%s Enter dataLen:%d", __func__, dataLen);
   if (nxpncihal_ctrl.p_nfc_stack_data_cback != NULL) {
-    (*nxpncihal_ctrl.p_nfc_stack_data_cback)(dataLen, (uint8_t*)pData);
+    (*nxpncihal_ctrl.p_nfc_stack_data_cback)(dataLen,
+                                             const_cast<uint8_t*>(pData));
   }
 }
 

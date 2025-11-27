@@ -82,10 +82,10 @@ void AutoCard::phNxpNciHal_getAutoCardConfig() {
                            rsp + COUNTER_START_INDEX + NO_OF_CNT_TO_UPDATE);
 
   uint8_t buffer[CNT_CONFIG_BUFF_MAX_SIZE] = {0};
-  long bufflen = CNT_CONFIG_BUFF_MAX_SIZE;
+  const long bufflen = CNT_CONFIG_BUFF_MAX_SIZE;
   long retlen = 0;
 
-  int isFound =
+  const int isFound =
       GetNxpByteArrayValue(NAME_NXP_AUTOCARD_COUNTERS,
                            reinterpret_cast<char*>(buffer), bufflen, &retlen);
   if (isFound > 0 && retlen == NO_OF_CNT_TO_UPDATE) {
@@ -138,14 +138,14 @@ NFCSTATUS AutoCard::handleVendorNciRspNtf(uint16_t dataLen, uint8_t* pData) {
        (pData[NCI_GID_INDEX] != (NCI_MT_NTF | NCI_GID_PROP))) ||
       (pData[NCI_OID_INDEX] != AUTOCARD_FW_API_OID) ||
       ((dataLen > AUTOCARD_STATUS_INDEX) &&
-       (pData[3] > AUTOCARD_SUSPEND_SUB_OID))) {
+       (pData[3] > AUTOCARD_GET_RF_PARAM))) {
     return NFCSTATUS_EXTN_FEATURE_FAILURE;
   }
 
   if (pData[NCI_GID_INDEX] == (NCI_MT_NTF | NCI_GID_PROP)) {
-    vector<uint8_t> autocardNtf = {(NCI_MT_NTF | NCI_GID_PROP),
-                                   NCI_ROW_MAINLINE_OID, AUTOCARD_PAYLOAD_LEN,
-                                   AUTOCARD_FEATURE_SUB_GID};
+    std::vector<uint8_t> autocardNtf = {
+        (NCI_MT_NTF | NCI_GID_PROP), NCI_ROW_MAINLINE_OID, AUTOCARD_PAYLOAD_LEN,
+        AUTOCARD_FEATURE_SUB_GID};
     autocardNtf[NCI_MSG_LEN_INDEX] =
         pData[NCI_MSG_LEN_INDEX] + AUTOCARD_HEADER_LEN;
     autocardNtf.insert(autocardNtf.end(), pData + NCI_MSG_LEN_INDEX,
@@ -153,12 +153,12 @@ NFCSTATUS AutoCard::handleVendorNciRspNtf(uint16_t dataLen, uint8_t* pData) {
     phNxpHal_NfcDataCallback(autocardNtf.size(), &autocardNtf[0]);
     return NFCSTATUS_EXTN_FEATURE_SUCCESS;
   }
-  uint8_t status = (dataLen > AUTOCARD_STATUS_INDEX)
+  const uint8_t status = (dataLen > AUTOCARD_STATUS_INDEX)
                        ? pData[AUTOCARD_STATUS_INDEX]
                        : pData[3];
-  vector<uint8_t> autocardRsp = {(NCI_MT_RSP | NCI_GID_PROP),
-                                 NCI_ROW_MAINLINE_OID, AUTOCARD_PAYLOAD_LEN,
-                                 AUTOCARD_FEATURE_SUB_GID};
+  std::vector<uint8_t> autocardRsp = {
+      (NCI_MT_RSP | NCI_GID_PROP), NCI_ROW_MAINLINE_OID, AUTOCARD_PAYLOAD_LEN,
+      AUTOCARD_FEATURE_SUB_GID};
 
   if (status != NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_E("%s Set autocard failed. Error: %d", __func__, status);
@@ -184,7 +184,7 @@ NFCSTATUS AutoCard::handleVendorNciMessage(uint16_t dataLen, uint8_t* pData) {
   if ((pData[NCI_GID_INDEX] != (NCI_MT_CMD | NCI_GID_PROP)) ||
       (pData[NCI_OID_INDEX] != NCI_ROW_PROP_OID_VAL) ||
       (pData[NCI_MSG_INDEX_FOR_FEATURE] != AUTOCARD_FEATURE_SUB_GID) ||
-      (pData[AUTOCARD_SUB_OID_IDEX] > AUTOCARD_FEATURE_DISABLE_SUB_OID)) {
+      (pData[AUTOCARD_SUB_OID_IDEX] > AUTOCARD_GET_RF_PARAM)) {
     return NFCSTATUS_EXTN_FEATURE_FAILURE;
   }
 
@@ -192,7 +192,7 @@ NFCSTATUS AutoCard::handleVendorNciMessage(uint16_t dataLen, uint8_t* pData) {
   uint8_t autocardStatus = NFCSTATUS_SUCCESS;
   AutoCard::getInstance()->autoCardCmdType = pData[AUTOCARD_SUB_OID_IDEX];
 
-  if (IS_CHIP_TYPE_NE(sn220u)) {
+  if (IS_CHIP_TYPE_L(sn220u)) {
     autocardStatus = AUTOCARD_STATUS_FEATURE_NOT_SUPPORTED;
     NXPLOG_NCIHAL_E("AutoCard selection is not supported.");
   } else if (!GetNxpNumValue(NAME_NXP_AUTOCARD_SELECTION_PHONE_OFF,
@@ -216,7 +216,7 @@ NFCSTATUS AutoCard::handleVendorNciMessage(uint16_t dataLen, uint8_t* pData) {
         pData[AUTOCARD_SUB_OID_IDEX] == AUTOCARD_FEATURE_DISABLE_SUB_OID) {
       if (pData[AUTOCARD_SUB_OID_IDEX] == AUTOCARD_FEATURE_ENABLE_SUB_OID &&
           mAutoCardEnableStatus == AUTOCARD_FEATURE_ENABLED) {
-        vector<uint8_t> autocardRsp = {
+        std::vector<uint8_t> autocardRsp = {
             (NCI_MT_RSP | NCI_GID_PROP), NCI_ROW_MAINLINE_OID,
             AUTOCARD_PAYLOAD_LEN,        AUTOCARD_FEATURE_SUB_GID,
             AUTOCARD_HEADER_LEN,         AUTOCARD_FEATURE_ENABLE_SUB_OID,
@@ -233,7 +233,7 @@ NFCSTATUS AutoCard::handleVendorNciMessage(uint16_t dataLen, uint8_t* pData) {
       autocardCmd.insert(autocardCmd.end(), mAutoCardCounters.begin(),
                          mAutoCardCounters.end());
     }
-    NFCSTATUS status =
+    const NFCSTATUS status =
         phNxpHal_EnqueueWrite(autocardCmd.data(), autocardCmd.size());
     if (status != NFCSTATUS_SUCCESS) {
       autocardStatus = AUTOCARD_STATUS_CMD_FAIL;

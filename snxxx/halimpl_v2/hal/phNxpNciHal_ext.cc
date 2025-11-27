@@ -43,7 +43,7 @@
 #define NXP_EN_SN330U 1
 #define NXP_NDEF_TAG_EMULATION_LOGICAL_CHANNEL 5
 #define NFC_NXP_MW_ANDROID_VER (16U)  /* Android version used by NFC MW */
-#define NFC_NXP_MW_VERSION_MAJ (0x08) /* MW Major Version */
+#define NFC_NXP_MW_VERSION_MAJ (0x0A) /* MW Major Version */
 #define NFC_NXP_MW_VERSION_MIN (0x00) /* MW Minor Version */
 #define NFC_NXP_MW_CUSTOMER_ID (0x00) /* MW Customer Id */
 #define NFC_NXP_MW_RC_VERSION (0x00)  /* MW RC Version */
@@ -129,7 +129,7 @@ void printNfcMwVersion() {
   validation |= (NXP_EN_SN330U << 18);
   validation |= (NXP_EN_PN557 << 11);
 
-  ALOGE("MW-HAL Version: NFC_AR_%02X_%05X_%02d.%02x.%02x_TC",
+  ALOGE("MW-HAL Version: NFC_AR_%02X_%05X_%02d.%02x.%02x",
         NFC_NXP_MW_CUSTOMER_ID, validation, NFC_NXP_MW_ANDROID_VER,
         NFC_NXP_MW_VERSION_MAJ, NFC_NXP_MW_VERSION_MIN);
 }
@@ -207,7 +207,9 @@ NFCSTATUS phNxpNciHal_set_ext_buffer(uint16_t* rsp_len, uint8_t* p_rsp) {
 NFCSTATUS phNxpNciHal_update_ext_buffer(uint16_t rsp_len, uint8_t* p_rsp) {
   // If response buffer is not yet set wait for it to set
   struct timespec timeout_spec;
-  clock_gettime(CLOCK_REALTIME, &timeout_spec);
+  if (clock_gettime(CLOCK_REALTIME, &timeout_spec) == -1) {
+    NXPLOG_NCIHAL_E("%s Fail get time; errno=0x%X", __func__, errno);
+  }
   timeout_spec.tv_sec += 1;
   pthread_mutex_lock(&gExtRxDataCtrl.rx_mutex);
   int status = 0;
@@ -581,14 +583,14 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
       nxpncihal_ctrl.nci_info.nci_version = p_ntf[5];
       if (!nxpncihal_ctrl.halStatus)
         phNxpNciHal_configFeatureList(p_ntf, *p_len);
-      int len = p_ntf[2] + 2; /*include 2 byte header*/
+      const int len = p_ntf[2] + 2; /*include 2 byte header*/
       if (len != *p_len - 1) {
         android_errorWriteLog(0x534e4554, "121263487");
         NXPLOG_NCIHAL_E("%s invalid CORE_RESET_NTF len", __func__);
         goto core_reset_err;
       }
-      wFwVerRsp = (((uint32_t)p_ntf[len - 2]) << 16U) |
-                  (((uint32_t)p_ntf[len - 1]) << 8U) | p_ntf[len];
+      wFwVerRsp = ((static_cast<uint32_t>(p_ntf[len - 2])) << 16U) |
+                  ((static_cast<uint32_t>(p_ntf[len - 1])) << 8U) | p_ntf[len];
       NXPLOG_NCIHAL_D("NxpNci> FW Version: %x.%x.%x", p_ntf[len - 2],
                       p_ntf[len - 1], p_ntf[len]);
     } else {
@@ -615,7 +617,7 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
       /* If NDEF T4T is enabled, then change Max Logical Connections to 5
       By default FW will return 0x01 but nfc_alloc_conn_cb will fail this way*/
       uint8_t retlen = 0;
-      if (GetNxpNumValue(NAME_T4T_NFCEE_ENABLE, (void*)&retlen,
+      if (GetNxpNumValue(NAME_T4T_NFCEE_ENABLE, static_cast<void*>(&retlen),
                          sizeof(retlen))) {
         if (retlen > 0 && *p_len > 8) {
           p_ntf[8] = NXP_NDEF_TAG_EMULATION_LOGICAL_CHANNEL;
@@ -632,14 +634,14 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
         NXPLOG_NCIHAL_E("%s invalid CORE_INIT_RSP len", __func__);
         goto core_reset_err;
       }
-      int len = p_ntf[2] + 2; /*include 2 byte header*/
+      const int len = p_ntf[2] + 2; /*include 2 byte header*/
       if (len != *p_len - 1) {
         android_errorWriteLog(0x534e4554, "121263487");
         NXPLOG_NCIHAL_E("%s invalid CORE_INIT_RSP len", __func__);
         goto core_reset_err;
       }
-      wFwVerRsp = (((uint32_t)p_ntf[len - 2]) << 16U) |
-                  (((uint32_t)p_ntf[len - 1]) << 8U) | p_ntf[len];
+      wFwVerRsp = ((static_cast<uint32_t>(p_ntf[len - 2])) << 16U) |
+                  ((static_cast<uint32_t>(p_ntf[len - 1])) << 8U) | p_ntf[len];
       if (wFwVerRsp == 0) {
         NXPLOG_NCIHAL_E("%s invalid FW Version: %x.%x.%x", __func__,
                         p_ntf[len - 2], p_ntf[len - 1], p_ntf[len]);
@@ -1164,8 +1166,8 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       mEEPROM_info->bufflen);
   NFCSTATUS status = NFCSTATUS_FAILED;
   uint8_t retry_cnt = 0;
-  uint8_t getCfgStartIndex = 0x08;
-  uint8_t setCfgStartIndex = 0x07;
+  const uint8_t getCfgStartIndex = 0x08;
+  const uint8_t setCfgStartIndex = 0x07;
   uint8_t memIndex = 0x00;
   uint8_t fieldLen = 0x01;  // Memory field len 1bytes
   char addr[2] = {0};
@@ -1176,7 +1178,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
   uint8_t *set_cfg_eeprom, *base_addr;
   uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
   uint16_t rsp_len = 0;
-  mEEPROM_info->update_mode = BITWISE;
+  mEEPROM_info->update_mode = static_cast<uint8_t>(BITWISE);
 
   switch (mEEPROM_info->request_type) {
     case EEPROM_RF_CFG:
@@ -1185,7 +1187,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       len = fieldLen + 4;  // 4 - numParam+2add+val
       addr[0] = 0xA0;
       addr[1] = 0x14;
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       break;
 
     case EEPROM_FW_DWNLD:
@@ -1194,11 +1196,11 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       len = fieldLen + 4;
       addr[0] = 0xA0;
       addr[1] = 0x0F;
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       break;
 
     case EEPROM_WIREDMODE_RESUME_TIMEOUT:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       fieldLen = 0x04;
       len = fieldLen + 4;
@@ -1213,7 +1215,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       addr[1] = 0xF2;
       break;
     case EEPROM_ESE_POWER_EXT_PMU:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0xD7;
@@ -1261,7 +1263,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       addr[1] = 0x0F;
       break;
     case EEPROM_AUTH_CMD_TIMEOUT:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       fieldLen = mEEPROM_info->bufflen;
       len = fieldLen + 4;
@@ -1269,47 +1271,47 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       addr[1] = 0xF7;
       break;
     case EEPROM_GUARD_TIMER:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       addr[0] = 0xA1;
       addr[1] = 0x0B;
       break;
     case EEPROM_AUTONOMOUS_MODE:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0x15;
       break;
     case EEPROM_T4T_NFCEE_ENABLE:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0x95;
       break;
     case EEPROM_CE_PHONE_OFF_CFG:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0x8E;
       break;
     case EEPROM_ENABLE_VEN_CFG:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0x07;
       break;
     case EEPROM_ISODEP_MERGE_SAK:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA1;
       addr[1] = 0x1B;
       break;
     case EEPROM_SRD_TIMEOUT:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       fieldLen = 0x02;
       len = fieldLen + 4;
@@ -1322,7 +1324,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0xE4;
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       break;
     case EEPROM_UICC2_SESSION_ID:
       fieldLen = mEEPROM_info->bufflen;
@@ -1330,10 +1332,10 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0xE5;
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       break;
     case EEPROM_CE_ACT_NTF:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA0;
@@ -1345,24 +1347,24 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0xE6;
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       break;
     case EEPROM_EXT_FIELD_DETECT_MODE:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA1;
       addr[1] = 0x36;
       break;
     case EEPROM_INTERPOLATED_RSSI_8AM:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       b_position = 0;
       memIndex = 0x00;
       addr[0] = 0xA0;
       addr[1] = 0x98;
       break;
     case EEPROM_CONF_GPIO_CTRL:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       fieldLen = mEEPROM_info->bufflen;
       len = fieldLen + 4;
@@ -1370,7 +1372,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       addr[1] = 0x0F;
       break;
     case EEPROM_SET_GPIO_VALUE:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       fieldLen = mEEPROM_info->bufflen;
       len = fieldLen + 4;
@@ -1378,7 +1380,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       addr[1] = 0x65;
       break;
     case EEPROM_POWER_TRACKER_ENABLE:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x00;
       fieldLen = mEEPROM_info->bufflen;
       len = fieldLen + 4;
@@ -1386,7 +1388,7 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
       addr[1] = 0x6D;
       break;
     case EEPROM_VDDPA:
-      mEEPROM_info->update_mode = BYTEWISE;
+      mEEPROM_info->update_mode = static_cast<uint8_t>(BYTEWISE);
       memIndex = 0x14;
       fieldLen = 0x30;
       len = fieldLen + 4;
@@ -1399,25 +1401,25 @@ NFCSTATUS request_EEPROM(phNxpNci_EEPROM_info_t* mEEPROM_info) {
   }
 
   uint8_t get_cfg_eeprom[6] = {
-      0x20,              // get_cfg header
-      0x03,              // get_cfg header
-      0x03,              // len of following value
-      0x01,              // Num Parameters
-      (uint8_t)addr[0],  // First byte of Address
-      (uint8_t)addr[1]   // Second byte of Address
+      0x20,                           // get_cfg header
+      0x03,                           // get_cfg header
+      0x03,                           // len of following value
+      0x01,                           // Num Parameters
+      static_cast<uint8_t>(addr[0]),  // First byte of Address
+      static_cast<uint8_t>(addr[1])   // Second byte of Address
   };
   uint8_t set_cfg_cmd_hdr[7] = {
-      0x20,              // set_cfg header
-      0x02,              // set_cfg header
-      len,               // len of following value
-      0x01,              // Num Param
-      (uint8_t)addr[0],  // First byte of Address
-      (uint8_t)addr[1],  // Second byte of Address
-      fieldLen           // Data len
+      0x20,                           // set_cfg header
+      0x02,                           // set_cfg header
+      len,                            // len of following value
+      0x01,                           // Num Param
+      static_cast<uint8_t>(addr[0]),  // First byte of Address
+      static_cast<uint8_t>(addr[1]),  // Second byte of Address
+      fieldLen                        // Data len
   };
 
   set_cfg_cmd_len = sizeof(set_cfg_cmd_hdr) + fieldLen;
-  set_cfg_eeprom = (uint8_t*)malloc(set_cfg_cmd_len);
+  set_cfg_eeprom = static_cast<uint8_t*>(malloc(set_cfg_cmd_len));
   if (set_cfg_eeprom == NULL) {
     ALOGE("memory allocation failed");
     return status;
@@ -1434,7 +1436,7 @@ retryget:
     if (status != NFCSTATUS_SUCCESS) {
       ALOGE("failed to get requested memory address");
     } else if (mEEPROM_info->request_mode == GET_EEPROM_DATA) {
-      if (mEEPROM_info->bufflen == 0xFF) {
+      if (mEEPROM_info->bufflen >= 0xFB) {
         /* Max buffer length for single Get Config Command is 0xFF.
          * If buffer length set to max value, reassign buffer value
          * depends on response from Get Config command */
@@ -1461,7 +1463,7 @@ retryget:
             set_cfg_eeprom[setCfgStartIndex + memIndex] &= (~(1 << b_position));
           }
         }
-      } else if (mEEPROM_info->update_mode == BYTEWISE) {
+      } else if (mEEPROM_info->update_mode == static_cast<uint8_t>(BYTEWISE)) {
         if (memcmp(set_cfg_eeprom + setCfgStartIndex + memIndex,
                    mEEPROM_info->buffer, mEEPROM_info->bufflen) != 0) {
           update_req = true;
@@ -1511,7 +1513,7 @@ retryget:
 NFCSTATUS phNxpNciHal_enableDefaultUICC2SWPline(uint8_t uicc2_sel) {
   NFCSTATUS status = NFCSTATUS_FAILED;
   uint8_t p_data[255] = {NCI_MT_CMD, NXP_CORE_SET_CONFIG_CMD};
-  uint8_t LEN_INDEX = 2, PARAM_INDEX = 3;
+  const uint8_t LEN_INDEX = 2, PARAM_INDEX = 3;
   uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
   uint16_t rsp_len = 0;
   uint8_t* p = p_data;
@@ -1550,7 +1552,7 @@ NFCSTATUS phNxpNciHal_enableDefaultUICC2SWPline(uint8_t uicc2_sel) {
  ******************************************************************************/
 void phNxpNciHal_prop_conf_lpcd(bool enableLPCD) {
   uint8_t cmd_get_lpcdval[] = {0x20, 0x03, 0x03, 0x01, 0xA0, 0x68};
-  vector<uint8_t> cmd_set_lpcdval{0x20, 0x02, 0x2E};
+  std::vector<uint8_t> cmd_set_lpcdval{0x20, 0x02, 0x2E};
   uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
   uint16_t rsp_len = 0;
   if (NFCSTATUS_SUCCESS == phNxpNciHal_send_ext_cmd(sizeof(cmd_get_lpcdval),
@@ -1597,9 +1599,9 @@ void phNxpNciHal_prop_conf_rssi() {
     NXPLOG_NCIHAL_D("%s: feature is not supported", __func__);
     return;
   }
-  vector<uint8_t> cmd_get_rssival = {0x20, 0x03, 0x03, 0x01, 0xA1, 0x55};
-  vector<uint8_t> cmd_set_rssival = {0x20, 0x02, 0x06, 0x01, 0xA1,
-                                     0x55, 0x02, 0x00, 0x00};
+  std::vector<uint8_t> cmd_get_rssival = {0x20, 0x03, 0x03, 0x01, 0xA1, 0x55};
+  std::vector<uint8_t> cmd_set_rssival = {0x20, 0x02, 0x06, 0x01, 0xA1,
+                                          0x55, 0x02, 0x00, 0x00};
   uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
   uint16_t rsp_len = 0;
 
@@ -1637,13 +1639,14 @@ void phNxpNciHal_prop_conf_rssi() {
 void phNxpNciHal_conf_nfc_forum_mode() {
   uint8_t cmd_get_emvcocfg[] = {0x20, 0x03, 0x03, 0x01, 0xA0, 0x44};
   uint8_t cmd_reset_emvcocfg[8];
-  long cmdlen = 8;
+  const long cmdlen = 8;
   long retlen = 0;
   uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
   uint16_t rsp_len = 0;
 
   if (GetNxpByteArrayValue(NAME_NXP_PROP_RESET_EMVCO_CMD,
-                           (char*)cmd_reset_emvcocfg, cmdlen, &retlen)) {
+                           reinterpret_cast<char*>(cmd_reset_emvcocfg), cmdlen,
+                           &retlen)) {
   }
   if (retlen != 0x08) {
     NXPLOG_NCIHAL_E("%s: command is not provided", __func__);
@@ -1685,12 +1688,12 @@ void phNxpNciHal_conf_nfc_forum_mode() {
 void RemoveNfcDepIntfFromInitResp(uint8_t* coreInitResp,
                                   uint16_t* coreInitRespLen) {
   /* As per NCI 2.0 index Number of Supported RF interfaces is 13 */
-  uint8_t indexOfSupportedRfIntf = 13;
+  const uint8_t indexOfSupportedRfIntf = 13;
   /* as per NCI 2.0 Number of Supported RF Interfaces Payload field index is 13
    * & 3 bytes for NCI_MSG_HEADER */
-  uint8_t noOfSupportedInterface =
+  const uint8_t noOfSupportedInterface =
       *(coreInitResp + indexOfSupportedRfIntf + NCI_HEADER_SIZE);
-  uint8_t rfInterfacesLength = static_cast<uint8_t>(
+  const uint8_t rfInterfacesLength = static_cast<uint8_t>(
       *coreInitRespLen - (indexOfSupportedRfIntf + 1 + NCI_HEADER_SIZE));
   uint8_t* supportedRfInterfaces = NULL;
   bool removeNfcDepRequired = false;
@@ -1714,7 +1717,7 @@ void RemoveNfcDepIntfFromInitResp(uint8_t* coreInitResp,
       removeNfcDepRequired = true;
       break;
     }
-    uint8_t noOfExtensions = *(supportedRfInterfaces + 1);
+    const uint8_t noOfExtensions = *(supportedRfInterfaces + 1);
     /* 2 bytes for RF interface type & length of Extensions */
     supportedRfInterfaces += (2 + noOfExtensions);
   }
@@ -1725,7 +1728,7 @@ void RemoveNfcDepIntfFromInitResp(uint8_t* coreInitResp,
     return;
   } else {
     coreInitResp[16] = noOfSupportedInterface - 1;
-    uint8_t noBytesToSkipForNfcDep = 2 + *(supportedRfInterfaces + 1);
+    const uint8_t noBytesToSkipForNfcDep = 2 + *(supportedRfInterfaces + 1);
     if (rfInterfacesLength <
         (supportedRfInterfaces - supportedRfInterfacesDetails) +
             noBytesToSkipForNfcDep) {
@@ -1809,7 +1812,7 @@ static bool phNxpNciHal_update_core_reset_ntf_prop() {
     is_abort_req = false;
   }
   ++core_reset_count;
-  std::string ntf_count_str = std::to_string(core_reset_count);
+  const std::string ntf_count_str = std::to_string(core_reset_count);
   NXPLOG_NCIHAL_D("Core reset counter prop value  %d", core_reset_count);
   if (NFCSTATUS_SUCCESS !=
       phNxpNciHal_setVendorProp(core_reset_ntf_count_prop_name,

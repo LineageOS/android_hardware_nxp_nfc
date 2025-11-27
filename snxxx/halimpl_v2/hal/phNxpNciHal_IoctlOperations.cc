@@ -40,6 +40,7 @@
 
 using android::base::WriteStringToFile;
 using namespace ::android::base;
+using std::string;
 using std::stringstream;
 
 #define TERMINAL_LEN 5
@@ -132,7 +133,8 @@ std::set<string> gNciConfigs = {"NXP_SE_COLD_TEMP_ERROR_DELAY",
  ******************************************************************************/
 int phNxpNciHal_ioctlIf(long arg, void* p_data) {
   NXPLOG_NCIHAL_D("%s : enter - arg = %ld", __func__, arg);
-  ese_nxp_IoctlInOutData_t* pInpOutData = (ese_nxp_IoctlInOutData_t*)p_data;
+  ese_nxp_IoctlInOutData_t* pInpOutData =
+      static_cast<ese_nxp_IoctlInOutData_t*>(p_data);
   int ret = -1;
 
   switch (arg) {
@@ -174,7 +176,7 @@ int phNxpNciHal_ioctlIf(long arg, void* p_data) {
  ** Parameters       string key
  **
  ** Returns          If Key is found, returns the respective property values
- **                  else returns the empty string
+ **                  else returns the null/empty string
  *******************************************************************************/
 string phNxpNciHal_getSystemProperty(string key) {
   int len;
@@ -185,7 +187,7 @@ string phNxpNciHal_getSystemProperty(string key) {
   } else if (property_get(key.c_str(), valueStr, "") > 0) {
     return valueStr;
   } else {
-    return "";
+    return NULL;
   }
 }
 /*******************************************************************************
@@ -208,7 +210,8 @@ bool phNxpNciHal_setSystemProperty(string key, string value) {
   unsigned tmp = 0;
   if (strcmp(key.c_str(), "nfc.debug_enabled") == 0) {
     if (ParseUint(value.c_str(), &tmp)) {
-      if (phNxpLog_EnableDisableLogLevel((uint8_t)tmp) != NFCSTATUS_SUCCESS) {
+      if (phNxpLog_EnableDisableLogLevel(static_cast<uint8_t>(tmp)) !=
+          NFCSTATUS_SUCCESS) {
         stat = false;
       }
     } else {
@@ -261,9 +264,9 @@ bool phNxpNciHal_setSystemProperty(string key, string value) {
 string phNxpNciHal_getNxpConfigIf() {
   std::string config;
   uint8_t* p_config = nullptr;
-  size_t config_size = readConfigFile(default_nxp_config_path, &p_config);
+  const size_t config_size = readConfigFile(default_nxp_config_path, &p_config);
   if (config_size) {
-    config.assign((char*)p_config, config_size);
+    config.assign(reinterpret_cast<char*>(p_config), config_size);
     free(p_config);
     phNxpNciHal_getFilteredConfig(config);
   }
@@ -310,7 +313,7 @@ static string phNxpNciHal_extractConfig(string& config) {
     auto search = line.find('=');
     if (search == string::npos) continue;
 
-    string key(Trim(line.substr(0, search)));
+    const string key(Trim(line.substr(0, search)));
     if (!phNxpNciHal_CheckKeyNeeded(key)) continue;
     if (key == "NXP_NFC_SE_TERMINAL_NUM" && !apduGate) {
       line = "NXP_SE_APDU_GATE_SUPPORT=0x01\n";
@@ -435,7 +438,7 @@ NFCSTATUS phNxpNciHal_resetEse(uint64_t resetType) {
   NFCSTATUS status = NFCSTATUS_FAILED;
 
   {
-    NfcHalAutoThreadMutex a(sHalFnLock);
+    const NfcHalAutoThreadMutex a(sHalFnLock);
     if (nxpncihal_ctrl.halStatus == HAL_STATUS_CLOSE) {
       if (NFCSTATUS_SUCCESS != phNxpNciHal_MinOpen()) {
         return NFCSTATUS_FAILED;
@@ -445,7 +448,7 @@ NFCSTATUS phNxpNciHal_resetEse(uint64_t resetType) {
 
   CONCURRENCY_LOCK();
   status = gpTransportObj->EseReset(gpphTmlNfc_Context->pDevHandle,
-                                    (EseResetType)resetType);
+                                    static_cast<EseResetType>(resetType));
   CONCURRENCY_UNLOCK();
   if (status != NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_E("EsePowerCycle failed");
@@ -487,8 +490,8 @@ NFCSTATUS phNxpNciHal_GetNfcGpiosStatus(uint32_t* gpiosstatus) {
 bool phNxpNciHal_setNxpTransitConfig(char* transitConfValue) {
   bool status = true;
   NXPLOG_NCIHAL_D("%s : Enter", __func__);
-  std::string transitConfFileName = "/data/vendor/nfc/libnfc-nxpTransit.conf";
-  long transitConfValueLen = strlen(transitConfValue) + 1;
+  const std::string transitConfFileName = "/data/vendor/nfc/libnfc-nxpTransit.conf";
+  const long transitConfValueLen = strlen(transitConfValue) + 1;
 
   if (transitConfValueLen > 1) {
     if (!WriteStringToFile(transitConfValue, transitConfFileName)) {
@@ -565,7 +568,10 @@ int phNxpNciHal_CheckFwRegFlashRequired(uint8_t* fw_update_req,
     }
     switch (option) {
       case FLASH_UPPER_VERSION:
-        wFwUpdateReq = (utf8_t)wFwVer > (utf8_t)wFwVerRsp ? true : false;
+        wFwUpdateReq =
+            static_cast<utf8_t>(wFwVer) > static_cast<utf8_t>(wFwVerRsp)
+                ? true
+                : false;
         break;
       case FLASH_DIFFERENT_VERSION:
         wFwUpdateReq = ((wFwVerRsp & 0x0000FFFF) != wFwVer) ? true : false;
@@ -608,7 +614,7 @@ void phNxpNciHal_txNfccClockSetCmd(void) {
   NFCSTATUS status = NFCSTATUS_FAILED;
 
   uint8_t set_clock_cmd[] = {0x20, 0x02, 0x05, 0x01, 0xA0, 0x03, 0x01, 0x08};
-  uint8_t setClkCmdLen = sizeof(set_clock_cmd);
+  const uint8_t setClkCmdLen = sizeof(set_clock_cmd);
   unsigned long clockSource = 0;
   unsigned long frequency = 0;
   uint32_t pllSetRetryCount = 3, dpllSetRetryCount = 3,
@@ -635,57 +641,66 @@ void phNxpNciHal_txNfccClockSetCmd(void) {
     switch (frequency) {
       case CLK_FREQ_13MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_13MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_13MHZ;
+        pCmd4PllSetting = const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_13MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_13MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_13MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_13MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_13MHZ);
         break;
       }
       case CLK_FREQ_19_2MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_19_2MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_19_2MHZ;
+        pCmd4PllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_19_2MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_19_2MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_19_2MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_19_2MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_19_2MHZ);
         break;
       }
       case CLK_FREQ_24MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_24MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_24MHZ;
+        pCmd4PllSetting = const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_24MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_24MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_24MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_24MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_24MHZ);
         break;
       }
       case CLK_FREQ_26MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_26MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_26MHZ;
+        pCmd4PllSetting = const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_26MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_26MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_26MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_26MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_26MHZ);
         break;
       }
       case CLK_FREQ_32MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_32MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_32MHZ;
+        pCmd4PllSetting = const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_32MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_32MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_32MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_32MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_32MHZ);
         break;
       }
       case CLK_FREQ_38_4MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_38_4MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_38_4MHZ;
+        pCmd4PllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_38_4MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_38_4MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_38_4MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_38_4MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_38_4MHZ);
         break;
       }
       case CLK_FREQ_48MHZ: {
         NXPLOG_NCIHAL_D("PLL setting for CLK_FREQ_48MHZ");
-        pCmd4PllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_PLL_48MHZ;
+        pCmd4PllSetting = const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_PLL_48MHZ);
         pllCmdLen = sizeof(PN557_SET_CONFIG_CMD_PLL_48MHZ);
-        pCmd4DpllSetting = (uint8_t*)PN557_SET_CONFIG_CMD_DPLL_48MHZ;
+        pCmd4DpllSetting =
+            const_cast<uint8_t*>(PN557_SET_CONFIG_CMD_DPLL_48MHZ);
         dpllCmdLen = sizeof(PN557_SET_CONFIG_CMD_DPLL_48MHZ);
         break;
       }

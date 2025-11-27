@@ -83,7 +83,8 @@ vector<uint8_t> ReaderPollConfigParser::getWellKnownModEventData(
  ***************************************************************************/
 vector<uint8_t> ReaderPollConfigParser::getUnknownEvent(
     vector<uint8_t> data, vector<uint8_t> timeStamp, uint8_t gain) {
-  uint8_t eventLength = timeStamp.size() + GAIN_FIELD_LENGTH + (int)data.size();
+  const uint8_t eventLength =
+      timeStamp.size() + GAIN_FIELD_LENGTH + static_cast<int>(data.size());
   vector<uint8_t> eventData;
   eventData.push_back(TYPE_UNKNOWN);
   eventData.push_back(SHORT_FLAG);  // Always short frame
@@ -110,7 +111,7 @@ vector<uint8_t> ReaderPollConfigParser::getUnknownEvent(
  ****************************************************************************/
 vector<uint8_t> ReaderPollConfigParser::getRFEventData(
     vector<uint8_t> timeStamp, uint8_t gain, bool rfState) {
-  uint8_t eventLength =
+  const uint8_t eventLength =
       timeStamp.size() + GAIN_FIELD_LENGTH + RF_STATE_FIELD_LENGTH;
   vector<uint8_t> eventData;
   eventData.push_back(TYPE_RF_FLAG);
@@ -119,7 +120,7 @@ vector<uint8_t> ReaderPollConfigParser::getRFEventData(
   eventData.insert(std::end(eventData), std::begin(timeStamp),
                    std::end(timeStamp));
   eventData.push_back(gain);
-  eventData.push_back((uint8_t)(rfState ? 0x01 : 0x00));
+  eventData.push_back(static_cast<uint8_t>(rfState ? 0x01 : 0x00));
   return eventData;
 }
 
@@ -173,7 +174,7 @@ vector<uint8_t> ReaderPollConfigParser::getTimestampInMicroSeconds(
   if (rawFrame.size() < 4) {
     return vector<uint8_t>{0x00, 0x00, 0x00, 0x00};
   }
-  uint32_t timeStampInMicroSeconds =
+  const uint32_t timeStampInMicroSeconds =
       ((rawFrame.at(1) << 8) + rawFrame.at(0)) * 1000 +
       ((rawFrame.at(3) << 8) + rawFrame.at(2));
 
@@ -204,10 +205,11 @@ vector<uint8_t> ReaderPollConfigParser::getEvent(vector<uint8_t> p_event,
                                                  uint8_t cmaEventType) {
   vector<uint8_t> event_data;
   if ((cmaEventType == L2_EVT_TAG &&
-       (int)p_event.size() < MIN_LEN_NON_CMA_EVT) ||
-      (cmaEventType == CMA_EVT_TAG && (int)p_event.size() < MIN_LEN_CMA_EVT) ||
+       static_cast<int>(p_event.size()) < MIN_LEN_NON_CMA_EVT) ||
+      (cmaEventType == CMA_EVT_TAG &&
+       static_cast<int>(p_event.size()) < MIN_LEN_CMA_EVT) ||
       (cmaEventType == CMA_EVT_EXTRA_DATA_TAG &&
-       (int)p_event.size() < MIN_LEN_CMA_EXTRA_DATA_EVT)) {
+       static_cast<int>(p_event.size()) < MIN_LEN_CMA_EXTRA_DATA_EVT)) {
     return event_data;
   }
 
@@ -218,13 +220,13 @@ vector<uint8_t> ReaderPollConfigParser::getEvent(vector<uint8_t> p_event,
 
     ReaderPollConfigParser::lastKnownGain = GAIN_NOT_SUPPORTED;
     if (gpMeasuredFieldStrength_of_gpRssiAt8Am != -1) {
-      uint16_t gain = ((p_event[INDEX_OF_L2_EVT_GAIN - 1] << 8) |
+      const uint16_t gain = ((p_event[INDEX_OF_L2_EVT_GAIN - 1] << 8) |
                        p_event[INDEX_OF_L2_EVT_GAIN]) *
                       gpMeasuredFieldStrength_of_gpRssiAt8Am;
       if (gain == 0) {
         ReaderPollConfigParser::lastKnownGain = GAIN_NOT_SUPPORTED;
       } else if (gain < GAIN_MAX_VALUE) {
-        ReaderPollConfigParser::lastKnownGain = (uint8_t)gain;
+        ReaderPollConfigParser::lastKnownGain = static_cast<uint8_t>(gain);
       } else {
         ReaderPollConfigParser::lastKnownGain = GAIN_MAX_VALUE;
       }
@@ -279,7 +281,7 @@ vector<uint8_t> ReaderPollConfigParser::getEvent(vector<uint8_t> p_event,
 
   } else if (cmaEventType == CMA_EVT_TAG) {
     // Timestamp should be in Big Endian format
-    int idx = 3;
+    const int idx = 3;
     vector<uint8_t> timestamp = getTimestampInMicroSeconds(p_event);
     switch (p_event[INDEX_OF_CMA_EVT_TYPE]) {
       // Trigger Type
@@ -386,8 +388,8 @@ bool ReaderPollConfigParser::parseAndSendReaderPollInfo(uint8_t* p_ntf,
 
   vector<uint8_t> readerPollInfoNotifications;
   while (idx < p_len) {
-    uint8_t entryTag = ((lxNotification[idx] & LX_TAG_MASK) >> 4);
-    uint8_t entryLength = (lxNotification[idx] & LX_LENGTH_MASK);
+    const uint8_t entryTag = ((lxNotification[idx] & LX_TAG_MASK) >> 4);
+    const uint8_t entryLength = (lxNotification[idx] & LX_LENGTH_MASK);
 
     idx++;
     if ((entryTag == L2_EVT_TAG || entryTag == CMA_EVT_TAG ||
@@ -401,13 +403,13 @@ bool ReaderPollConfigParser::parseAndSendReaderPollInfo(uint8_t* p_ntf,
           (entryTag == L2_EVT_TAG || entryTag == CMA_EVT_TAG)) {
         resetExtraBytesInfo();
       }
-      vector<uint8_t> readerPollInfo =
-          getEvent(vector<uint8_t>(lxNotification.begin() + idx,
-                                   lxNotification.begin() + idx + entryLength),
-                   entryTag);
+      vector<uint8_t> partialLxNtf;
+      partialLxNtf.assign(lxNotification.begin() + idx,
+                          lxNotification.begin() + idx + entryLength);
+      vector<uint8_t> readerPollInfo = getEvent(partialLxNtf, entryTag);
 
-      if ((int)(readerPollInfoNotifications.size() + readerPollInfo.size()) >=
-          0xFF) {
+      if (static_cast<int>(readerPollInfoNotifications.size() +
+                           readerPollInfo.size()) >= 0xFF) {
         notifyPollingLoopInfoEvent(readerPollInfoNotifications);
         readerPollInfoNotifications.clear();
       }

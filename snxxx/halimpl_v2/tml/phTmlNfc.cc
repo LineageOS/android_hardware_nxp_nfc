@@ -91,7 +91,7 @@ NFCSTATUS phTmlNfc_Init(pphTmlNfc_Config_t pConfig) {
   } else {
     /* Allocate memory for TML context */
     gpphTmlNfc_Context =
-        (phTmlNfc_Context_t*)malloc(sizeof(phTmlNfc_Context_t));
+        static_cast<phTmlNfc_Context_t*>(malloc(sizeof(phTmlNfc_Context_t)));
 
     if (NULL == gpphTmlNfc_Context) {
       wInitStatus = PHNFCSTVAL(CID_NFC_TML, NFCSTATUS_FAILED);
@@ -125,11 +125,9 @@ NFCSTATUS phTmlNfc_Init(pphTmlNfc_Config_t pConfig) {
           pConfig->fragment_len = PH_TMLNFC_FRGMENT_SIZE_PN557;
         gpphTmlNfc_Context->fragment_len = pConfig->fragment_len;
 
-        if (0 != sem_init(&gpphTmlNfc_Context->rxSemaphore, 0, 0)) {
-          wInitStatus = NFCSTATUS_FAILED;
-        } else if (0 != phTmlNfc_WaitReadInit()) {
-          wInitStatus = NFCSTATUS_FAILED;
-        } else if (0 != sem_init(&gpphTmlNfc_Context->postMsgSemaphore, 0, 0)) {
+        if (0 != sem_init(&gpphTmlNfc_Context->rxSemaphore, 0, 0) ||
+            (0 != phTmlNfc_WaitReadInit()) ||
+            (0 != sem_init(&gpphTmlNfc_Context->postMsgSemaphore, 0, 0))) {
           wInitStatus = NFCSTATUS_FAILED;
         } else {
           sem_post(&gpphTmlNfc_Context->postMsgSemaphore);
@@ -174,11 +172,12 @@ NFCSTATUS phTmlNfc_Init(pphTmlNfc_Config_t pConfig) {
 NFCSTATUS phTmlNfc_ConfigTransport() {
   unsigned long transportType = UNKNOWN;
   unsigned long value = 0;
-  int isfound = GetNxpNumValue(NAME_NXP_TRANSPORT, &value, sizeof(value));
+  const int isfound = GetNxpNumValue(NAME_NXP_TRANSPORT, &value, sizeof(value));
   if (isfound > 0) {
     transportType = value;
   }
-  gpTransportObj = transportFactory.getTransport((transportIntf)transportType);
+  gpTransportObj =
+      transportFactory.getTransport(static_cast<transportIntf>(transportType));
   if (gpTransportObj == nullptr) {
     NXPLOG_TML_E("No Transport channel available \n");
     return NFCSTATUS_FAILED;
@@ -207,7 +206,7 @@ static NFCSTATUS phTmlNfc_StartThread(void) {
   /* Create Reader thread */
   pthread_create_status =
       pthread_create(&gpphTmlNfc_Context->readerThread, NULL,
-                     &phTmlNfc_TmlThread, (void*)h_threadsEvent);
+                     &phTmlNfc_TmlThread, h_threadsEvent);
   if (0 != pthread_create_status) {
     wStartStatus = NFCSTATUS_FAILED;
     NXPLOG_TML_E("pthread_create failed error no : %d \n", errno);
@@ -345,7 +344,7 @@ void phTmlNfc_CleanUp(void) {
   pthread_mutex_destroy(&gpphTmlNfc_Context->wait_busy_lock);
   gpTransportObj = NULL;
   /* Clear memory allocated for storing Context variables */
-  free((void*)gpphTmlNfc_Context);
+  free(static_cast<void*>(gpphTmlNfc_Context));
   /* Set the pointer to NULL to indicate De-Initialization */
   gpphTmlNfc_Context = NULL;
 
@@ -391,7 +390,8 @@ NFCSTATUS phTmlNfc_Shutdown(void) {
     phTmlNfc_IoCtl(phTmlNfc_e_ResetNfcState);
     gpTransportObj->Close(gpphTmlNfc_Context->pDevHandle);
     gpphTmlNfc_Context->pDevHandle = NULL;
-    if (0 != pthread_join(gpphTmlNfc_Context->readerThread, (void**)NULL)) {
+    if (0 != pthread_join(gpphTmlNfc_Context->readerThread,
+                          static_cast<void**>(NULL))) {
       NXPLOG_TML_E("Fail to kill reader thread!");
     }
     NXPLOG_TML_D("bThreadDone == 0");
@@ -445,20 +445,19 @@ NFCSTATUS phTmlNfc_Write(uint8_t* pBuffer, uint16_t wLength) {
 
         /* Try NFCC Write Five Times, if it fails: */
         if (-1 == dwNoBytesWrRd) {
-          if ((gpTransportObj->IsFwDnldModeEnabled()) &&
-              (retry_cnt++ < MAX_WRITE_RETRY_COUNT)) {
-            NXPLOG_TML_D("NFCC - Error in Write  - Retry 0x%x", retry_cnt);
+          if (retry_cnt++ < MAX_WRITE_RETRY_COUNT) {
+            NXPLOG_TML_E("NFCC - Error in Write  - Retry 0x%x", retry_cnt);
             // Add a 10 ms delay to ensure NFCC is not still in stand by mode.
             usleep(10 * 1000);
           } else {
-            NXPLOG_TML_D("NFCC - Error in Write.....\n");
+            NXPLOG_TML_E("NFCC - Error in Write.....\n");
             wStatus = PHNFCSTVAL(CID_NFC_TML, NFCSTATUS_FAILED);
             break;
           }
         } else {
           phNxpNciHal_print_packet("SEND", pBuffer, wLength);
           retry_cnt = 0;
-          NXPLOG_TML_D("NFCC - Write successful.....\n");
+          NXPLOG_TML_I("NFCC - Write successful.....\n");
           break;
         }
       } while (true);
@@ -603,7 +602,7 @@ NFCSTATUS phTmlNfc_IoCtl(phTmlNfc_ControlCode_t eControlCode) {
     wStatus = NFCSTATUS_FAILED;
   } else {
     pthread_mutex_lock(&gpphTmlNfc_Context->tReadInfo.lock);
-    uint8_t read_flag = (gpphTmlNfc_Context->tReadInfo.bEnable > 0);
+    const uint8_t read_flag = (gpphTmlNfc_Context->tReadInfo.bEnable > 0);
 
     switch (eControlCode) {
       case phTmlNfc_e_PowerReset: {
@@ -785,7 +784,8 @@ void phTmlNfc_DeferredCall(uintptr_t dwThreadId,
 *******************************************************************************/
 static void phTmlNfc_ReadDeferredCb(void* pParams) {
   /* Transaction info buffer to be passed to Callback Function */
-  phTmlNfc_TransactInfo_t* pTransactionInfo = (phTmlNfc_TransactInfo_t*)pParams;
+  phTmlNfc_TransactInfo_t* pTransactionInfo =
+      static_cast<phTmlNfc_TransactInfo_t*>(pParams);
 
   /* Reset the flag to accept another Read Request */
   gpphTmlNfc_Context->tReadInfo.bThreadBusy = false;
@@ -870,7 +870,7 @@ bool phTmlNfc_IsFwDnldModeEnabled(void) {
 **
 *******************************************************************************/
 NFCSTATUS phTmlNfc_Shutdown_CleanUp() {
-  NFCSTATUS wShutdownStatus = phTmlNfc_Shutdown();
+  const NFCSTATUS wShutdownStatus = phTmlNfc_Shutdown();
   phTmlNfc_CleanUp();
   return wShutdownStatus;
 }

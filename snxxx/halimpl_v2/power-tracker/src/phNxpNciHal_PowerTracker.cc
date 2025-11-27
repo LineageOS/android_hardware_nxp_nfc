@@ -44,7 +44,7 @@ using std::vector;
 #define NXP_EN_SN300U 1
 #define NXP_EN_SN330U 1
 #define NFC_NXP_MW_ANDROID_VER (16U)  /* Android version used by NFC MW */
-#define NFC_NXP_MW_VERSION_MAJ (0x08) /* MW Major Version */
+#define NFC_NXP_MW_VERSION_MAJ (0x0A) /* MW Major Version */
 #define NFC_NXP_MW_VERSION_MIN (0x00) /* MW Minor Version */
 #define NFC_NXP_MW_CUSTOMER_ID (0x00) /* MW Customer Id */
 #define NFC_NXP_MW_RC_VERSION (0x00)  /* MW RC Version */
@@ -120,9 +120,9 @@ static void printPowerTrackerVersion() {
   validation |= (NXP_EN_SN330U << 18);
   validation |= (NXP_EN_PN557 << 11);
 
-  NXPLOG_NCIHAL_I("Power Tracker Version: NXP_AR_%02X_%05X_%02d.%02x.%02x_TC",
-                  NFC_NXP_MW_CUSTOMER_ID, validation, NFC_NXP_MW_ANDROID_VER,
-                  NFC_NXP_MW_VERSION_MAJ, NFC_NXP_MW_VERSION_MIN);
+  NXPLOG_NCIHAL_I("Power Tracker Version: NXP_AR_%02X_%05X_%02d.%02x.%02x",
+        NFC_NXP_MW_CUSTOMER_ID, validation, NFC_NXP_MW_ANDROID_VER,
+        NFC_NXP_MW_VERSION_MAJ, NFC_NXP_MW_VERSION_MIN);
 }
 
 /*******************************************************************************
@@ -297,8 +297,13 @@ static NFCSTATUS phNxpNciHal_syncPowerTrackerData() {
   // Standby counter is same as active counter less one as current
   // data sync will move NFCC to active resulting in one value
   // higher than standby
-  gContext.stateData[STANDBY].stateEntryCount =
-      (gContext.stateData[ACTIVE].stateEntryCount - 1);
+  if (gContext.stateData[ACTIVE].stateEntryCount == 0) {
+    gContext.stateData[STANDBY].stateEntryCount = 0;
+    NXPLOG_NCIHAL_D("Initialized standby count to 0 (active count is 0)");
+  } else {
+    gContext.stateData[STANDBY].stateEntryCount =
+        (gContext.stateData[ACTIVE].stateEntryCount - 1);
+  }
   if ((totalTimeMs / STEP_TIME_MS) > activeTick) {
     gContext.stateData[STANDBY].stateTickCount +=
         ((totalTimeMs / STEP_TIME_MS) - activeTick);
@@ -447,7 +452,9 @@ NFCSTATUS phNxpNciHal_stopPowerTracker() {
     }
   } else {
     NXPLOG_NCIHAL_E("PowerTracker is already disabled");
+    return status;
   }
+  gContext.ulpdetTimer.kill();
   mEEPROM_info.request_mode = SET_EEPROM_DATA;
   mEEPROM_info.buffer = (uint8_t*)&power_tracker_disable;
   mEEPROM_info.bufflen = sizeof(power_tracker_disable);

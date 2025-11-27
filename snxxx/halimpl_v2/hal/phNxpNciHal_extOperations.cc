@@ -28,16 +28,20 @@
 #include "ReaderPollConfigParser.h"
 #include "phNfcCommon.h"
 #include "phNxpNciHal_IoctlOperations.h"
+#include "phNxpNciHal_ReaderAnnotation.h"
 #include "phNxpNciHal_ULPDet.h"
 #include "phNxpNciHal_VendorProp.h"
 
+using std::string;
+
 #define NCI_HEADER_SIZE 3
 #define NCI_SE_CMD_LEN 4
+#define EEPROM_TLV_SIZE 4 //numParam+2add+val
 nxp_nfc_config_ext_t config_ext;
-static vector<uint8_t> uicc1HciParams(0);
-static vector<uint8_t> uicc2HciParams(0);
-static vector<uint8_t> uiccHciCeParams(0);
-static vector<uint8_t> interpolatedRssi8AmRsp(0);
+static std::vector<uint8_t> uicc1HciParams(0);
+static std::vector<uint8_t> uicc2HciParams(0);
+static std::vector<uint8_t> uiccHciCeParams(0);
+static std::vector<uint8_t> interpolatedRssi8AmRsp(0);
 extern phNxpNciHal_Control_t nxpncihal_ctrl;
 extern phTmlNfc_Context_t* gpphTmlNfc_Context;
 extern void* RfFwRegionDnld_handle;
@@ -57,10 +61,10 @@ void phNxpNciHal_getExtVendorConfig() {
   memset(&config_ext, 0x00, sizeof(nxp_nfc_config_ext_t));
 
   if ((GetNxpNumValue(NAME_NXP_AUTONOMOUS_ENABLE, &num, sizeof(num)))) {
-    config_ext.autonomous_mode = (uint8_t)num;
+    config_ext.autonomous_mode = static_cast<uint8_t>(num);
   }
   if ((GetNxpNumValue(NAME_NXP_GUARD_TIMER_VALUE, &num, sizeof(num)))) {
-    config_ext.guard_timer_value = (uint8_t)num;
+    config_ext.guard_timer_value = static_cast<uint8_t>(num);
   }
 }
 
@@ -100,7 +104,7 @@ NFCSTATUS phNxpNciHal_setAutonomousMode() {
   if (config_ext.autonomous_mode) autonomous_mode_value = 0x02;
 
   mEEPROM_info.request_mode = SET_EEPROM_DATA;
-  mEEPROM_info.buffer = (uint8_t*)&autonomous_mode_value;
+  mEEPROM_info.buffer = &autonomous_mode_value;
   mEEPROM_info.bufflen = sizeof(autonomous_mode_value);
   mEEPROM_info.request_type = EEPROM_AUTONOMOUS_MODE;
 
@@ -157,6 +161,9 @@ static int8_t get_system_property_se_type(uint8_t se_type) {
       break;
     case SE_TYPE_UICC2:
       len = property_get("nfc.product.support.uicc2", valueStr, "");
+      break;
+    default :
+      NXPLOG_NCIHAL_E("unexpected se_type received");
       break;
   }
   if (strlen(valueStr) == 0 || len <= 0) {
@@ -218,6 +225,9 @@ void phNxpNciHal_read_and_update_se_state() {
         }
         NXPLOG_NCIHAL_D("Get property : SUPPORT_UICC2 %d", val);
         break;
+      default :
+        NXPLOG_NCIHAL_E("unexpected se_type received");
+        break;
     }
   }
   if (num_se < 1) {
@@ -269,6 +279,9 @@ void phNxpNciHal_read_and_update_se_state() {
           *index++ = 0x01;
           *index++ = values[SE_TYPE_UICC2];
         }
+        break;
+      default :
+        NXPLOG_NCIHAL_E("unexpected se_type received");
         break;
     }
   }
@@ -338,48 +351,49 @@ NFCSTATUS phNxpNciHal_save_uicc_params() {
   }
 
   NFCSTATUS status = NFCSTATUS_FAILED;
+  const uint8_t maxbufflen = (0xFF - EEPROM_TLV_SIZE);
 
   /* Getting UICC2 CL params */
-  uicc1HciParams.resize(0xFF);
+  uicc1HciParams.resize(maxbufflen);
   status = phNxpNciHal_get_uicc_hci_params(
       uicc1HciParams, uicc1HciParams.size(), EEPROM_UICC1_SESSION_ID);
   if (status != NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_E("%s: Save UICC1 CLPP failed .", __func__);
   } else {
     // Convert from hexadecimal to character
-    string uicc1HciParamsStr =
+    const string uicc1HciParamsStr =
         phNxpNciHal_HexToString(uicc1HciParams.data(), uicc1HciParams.size());
-    string propName = "persist.vendor.nfc.nxp.uicc1HciParams";
+    const string propName = "persist.vendor.nfc.nxp.uicc1HciParams";
     phNxpNciHal_setFragmentedVendorProp(propName.c_str(),
                                         uicc1HciParamsStr.c_str());
   }
 
   /* Getting UICC2 CL params */
-  uicc2HciParams.resize(0xFF);
+  uicc2HciParams.resize(maxbufflen);
   status = phNxpNciHal_get_uicc_hci_params(
       uicc2HciParams, uicc2HciParams.size(), EEPROM_UICC2_SESSION_ID);
   if (status != NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_E("%s: Save UICC2 CLPP failed .", __func__);
   } else {
     // Convert to character
-    string uicc2HciParamsStr =
+    const string uicc2HciParamsStr =
         phNxpNciHal_HexToString(uicc2HciParams.data(), uicc2HciParams.size());
-    string propName = "persist.vendor.nfc.nxp.uicc2HciParams";
+    const string propName = "persist.vendor.nfc.nxp.uicc2HciParams";
     phNxpNciHal_setFragmentedVendorProp(propName.c_str(),
                                         uicc2HciParamsStr.c_str());
   }
 
   /* Get UICC CE HCI State */
-  uiccHciCeParams.resize(0xFF);
+  uiccHciCeParams.resize(maxbufflen);
   status = phNxpNciHal_get_uicc_hci_params(
       uiccHciCeParams, uiccHciCeParams.size(), EEPROM_UICC_HCI_CE_STATE);
   if (status != NFCSTATUS_SUCCESS) {
     NXPLOG_NCIHAL_E("%s: Save UICC_HCI_CE_STATE failed .", __func__);
   } else {
     // Convert to character
-    string uiccHciCeParamsStr =
+    const string uiccHciCeParamsStr =
         phNxpNciHal_HexToString(uiccHciCeParams.data(), uiccHciCeParams.size());
-    string propName = "persist.vendor.nfc.nxp.uiccHciCeParams";
+    const string propName = "persist.vendor.nfc.nxp.uiccHciCeParams";
     phNxpNciHal_setVendorProp(propName.c_str(), uiccHciCeParamsStr.c_str());
   }
   return status;
@@ -411,7 +425,7 @@ NFCSTATUS phNxpNciHal_restore_uicc_params() {
     uicc1HciParams.resize(uiccHciParamsStr.length() / 2);
     // Convert from string to hexadecimal format
     phNxpNciHal_StringToHex(uiccHciParamsStr.c_str(), uiccHciParamsStr.length(),
-                            (char*)uicc1HciParams.data());
+                            reinterpret_cast<char*>(uicc1HciParams.data()));
     if (uicc1HciParams.size() > 0) {
       status = phNxpNciHal_set_uicc_hci_params(
           uicc1HciParams, uicc1HciParams.size(), EEPROM_UICC1_SESSION_ID);
@@ -434,7 +448,7 @@ NFCSTATUS phNxpNciHal_restore_uicc_params() {
     uicc2HciParams.resize(uiccHciParamsStr.length() / 2);
     // Convert from string to hexadecimal format
     phNxpNciHal_StringToHex(uiccHciParamsStr.c_str(), uiccHciParamsStr.length(),
-                            (char*)uicc2HciParams.data());
+                            reinterpret_cast<char*>(uicc2HciParams.data()));
     if (uicc2HciParams.size() > 0) {
       status = phNxpNciHal_set_uicc_hci_params(
           uicc2HciParams, uicc2HciParams.size(), EEPROM_UICC2_SESSION_ID);
@@ -458,7 +472,7 @@ NFCSTATUS phNxpNciHal_restore_uicc_params() {
   uiccHciCeParams.resize(strlen(hciParamsStr) / 2);
   // Convert from string to hexadecimal format
   phNxpNciHal_StringToHex(hciParamsStr, strlen(hciParamsStr),
-                          (char*)uiccHciCeParams.data());
+                          reinterpret_cast<char*>(uiccHciCeParams.data()));
 
   if (uiccHciCeParams.size() > 0) {
     status = phNxpNciHal_set_uicc_hci_params(
@@ -486,7 +500,7 @@ NFCSTATUS phNxpNciHal_restore_uicc_params() {
  *
  ******************************************************************************/
 NFCSTATUS
-phNxpNciHal_get_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
+phNxpNciHal_get_uicc_hci_params(std::vector<uint8_t>& ptr, uint8_t bufflen,
                                 phNxpNci_EEPROM_request_type_t uiccType) {
   if (IS_CHIP_TYPE_L(sn220u)) {
     NXPLOG_NCIHAL_E("%s Not supported", __func__);
@@ -497,7 +511,7 @@ phNxpNciHal_get_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
   mEEPROM_info.bufflen = bufflen;
   mEEPROM_info.request_type = uiccType;
   mEEPROM_info.request_mode = GET_EEPROM_DATA;
-  NFCSTATUS status = request_EEPROM(&mEEPROM_info);
+  const NFCSTATUS status = request_EEPROM(&mEEPROM_info);
   ptr.resize(mEEPROM_info.bufflen);
   return status;
 }
@@ -514,7 +528,7 @@ phNxpNciHal_get_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
  *
  *****************************************************************************/
 NFCSTATUS
-phNxpNciHal_set_uicc_hci_params(vector<uint8_t>& ptr, uint8_t bufflen,
+phNxpNciHal_set_uicc_hci_params(std::vector<uint8_t>& ptr, uint8_t bufflen,
                                 phNxpNci_EEPROM_request_type_t uiccType) {
   if (IS_CHIP_TYPE_L(sn220u)) {
     NXPLOG_NCIHAL_E("%s Not supported", __func__);
@@ -553,8 +567,8 @@ NFCSTATUS phNxpNciHal_send_get_cfg(const uint8_t* cmd_get_cfg, long cmd_len) {
   }
 
   do {
-    status =
-        phNxpNciHal_send_ext_cmd(cmd_len, (uint8_t*)cmd_get_cfg, &rsp_len, rsp);
+    status = phNxpNciHal_send_ext_cmd(
+        cmd_len, const_cast<uint8_t*>(cmd_get_cfg), &rsp_len, rsp);
   } while ((status != NFCSTATUS_SUCCESS) &&
            (retry_cnt++ < NXP_MAX_RETRY_COUNT));
 
@@ -584,14 +598,14 @@ NFCSTATUS phNxpNciHal_configure_merge_sak() {
   NXPLOG_NCIHAL_D("Performing ISODEP sak merge settings");
   uint8_t val = 0;
 
-  if (!GetNxpNumValue(NAME_NXP_ISO_DEP_MERGE_SAK, (void*)&retlen,
+  if (!GetNxpNumValue(NAME_NXP_ISO_DEP_MERGE_SAK, static_cast<void*>(&retlen),
                       sizeof(retlen))) {
     retlen = 0x01;
     NXPLOG_NCIHAL_D(
         "ISO_DEP_MERGE_SAK not found. default shall be enabled : 0x%02lx",
         retlen);
   }
-  val = (uint8_t)retlen;
+  val = static_cast<uint8_t>(retlen);
   mEEPROM_info.buffer = &val;
   mEEPROM_info.bufflen = sizeof(val);
   mEEPROM_info.request_type = EEPROM_ISODEP_MERGE_SAK;
@@ -611,7 +625,7 @@ NFCSTATUS phNxpNciHal_configure_merge_sak() {
 NFCSTATUS phNxpNciHal_setSrdtimeout() {
   long retlen = 0;
   uint8_t* buffer = nullptr;
-  long bufflen = 260;
+  const long bufflen = 260;
   const int NXP_SRD_TIMEOUT_BUF_LEN = 2;
   const uint16_t TIMEOUT_MASK = 0xFFFF;
   const uint16_t MAX_TIMEOUT_VALUE = 0xFD70;
@@ -622,13 +636,13 @@ NFCSTATUS phNxpNciHal_setSrdtimeout() {
 
   NXPLOG_NCIHAL_D("Performing SRD Timeout settings");
 
-  buffer = (uint8_t*)malloc(bufflen * sizeof(uint8_t));
+  buffer = static_cast<uint8_t*>(malloc(bufflen * sizeof(uint8_t)));
   if (NULL == buffer) {
     return NFCSTATUS_FAILED;
   }
   memset(buffer, 0x00, bufflen);
-  if (GetNxpByteArrayValue(NAME_NXP_SRD_TIMEOUT, (char*)buffer, bufflen,
-                           &retlen)) {
+  if (GetNxpByteArrayValue(NAME_NXP_SRD_TIMEOUT,
+                           reinterpret_cast<char*>(buffer), bufflen, &retlen)) {
     if (retlen == NXP_SRD_TIMEOUT_BUF_LEN) {
       isValid_timeout = ((buffer[1] << 8) & TIMEOUT_MASK);
       isValid_timeout = (isValid_timeout | buffer[0]);
@@ -714,7 +728,7 @@ NFCSTATUS phNxpNciHal_getInterpolatedRssi8Am() {
   mEEPROM_info.bufflen = interpolatedRssi8AmRsp.size();
   mEEPROM_info.request_type = EEPROM_INTERPOLATED_RSSI_8AM;
   mEEPROM_info.request_mode = GET_EEPROM_DATA;
-  NFCSTATUS status = request_EEPROM(&mEEPROM_info);
+  const NFCSTATUS status = request_EEPROM(&mEEPROM_info);
   interpolatedRssi8AmRsp.resize(mEEPROM_info.bufflen);
 
   if (interpolatedRssi8AmRsp.size() < 4) {
@@ -722,10 +736,10 @@ NFCSTATUS phNxpNciHal_getInterpolatedRssi8Am() {
     return NFCSTATUS_FAILED;
   }
 
-  uint16_t rssiAt8Am =
-      (uint16_t)((interpolatedRssi8AmRsp[RSSI_AT_8AM_INDEX + 1] << 8) |
-                 interpolatedRssi8AmRsp[RSSI_AT_8AM_INDEX]);
-  uint8_t measuredFieldStrength =
+  const uint16_t rssiAt8Am = static_cast<uint16_t>(
+      (interpolatedRssi8AmRsp[RSSI_AT_8AM_INDEX + 1] << 8) |
+      interpolatedRssi8AmRsp[RSSI_AT_8AM_INDEX]);
+  const uint8_t measuredFieldStrength =
       interpolatedRssi8AmRsp[MEASURED_FIELD_STRENGTH];
   setInterpolatedRssi8Am(rssiAt8Am, measuredFieldStrength);
   return status;
@@ -759,7 +773,7 @@ NFCSTATUS phNxpNciHal_configGPIOControl(uint8_t gpioCtrl[], uint8_t len) {
   phNxpNci_EEPROM_info_t mEEPROM_info = {.request_mode = 0};
 
   mEEPROM_info.request_mode = SET_EEPROM_DATA;
-  mEEPROM_info.buffer = (uint8_t*)gpioCtrl;
+  mEEPROM_info.buffer = static_cast<uint8_t*>(gpioCtrl);
   // First two bytes decides purpose of GPIO config
   // LIKE ULPDET, GPIO CTRL
   mEEPROM_info.bufflen = 2;
@@ -862,7 +876,7 @@ void phNxpNciHal_setDCDCConfig(void) {
       0x32, 0x01, 0xC8, 0x03, 0x00};
   unsigned long enable = 0;
   NFCSTATUS status = NFCSTATUS_FAILED;
-  if (!GetNxpNumValue(NAME_NXP_ENABLE_DCDC_ON, (void*)&enable,
+  if (!GetNxpNumValue(NAME_NXP_ENABLE_DCDC_ON, static_cast<void*>(&enable),
                       sizeof(enable))) {
     NXPLOG_NCIHAL_D("NAME_NXP_ENABLE_DCDC_ON not found:");
     return;
@@ -900,6 +914,77 @@ bool phNxpNciHal_isVndSpecificAndroidCmd(uint16_t data_len,
 }
 
 /*******************************************************************************
+ *
+ * Function         handleReaderModeAnnotationCommand()
+ *
+ * Description      Handles reader mode annotation command processing
+ *
+ * Returns          It returns number of bytes received.
+ *
+ ******************************************************************************/
+int handleReaderModeAnnotationCommand(uint16_t data_len, const uint8_t* p_data) {
+  // Validate input parameters
+  if (p_data == nullptr) {
+    // Cannot send callback response if p_data is null since we need OID and
+    // feature indices
+    NXPLOG_NCIHAL_E("handleReaderModeAnnotationCommand: p_data is null");
+    return 0;
+  }
+
+  if (data_len < 4) {
+    std::vector<uint8_t> errorResponse = {0x01};  // Error status
+    phNxpNciHal_vendorSpecificCallback(p_data[NCI_OID_INDEX],
+                                       p_data[NCI_MSG_INDEX_FOR_FEATURE],
+                                       std::move(errorResponse));
+    return 0;
+  }
+
+  std::vector<uint8_t> convertedCommand =
+      covertAnnotationToBrodcastPollCommand(data_len, p_data);
+
+  std::vector<uint8_t> response;
+
+  if (!convertedCommand.empty()) {
+    // Send the converted command to NFCC
+    uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
+    uint16_t rsp_len = 0;
+
+    const NFCSTATUS broadcastPollCmdStatus = phNxpNciHal_send_ext_cmd(
+        convertedCommand.size(), convertedCommand.data(), &rsp_len, rsp);
+
+    if (broadcastPollCmdStatus == NFCSTATUS_SUCCESS) {
+      // Parse the response to get status
+      const uint8_t responseStatus = parseBroadcastPollCommandResponse(rsp_len, rsp);
+      response.push_back(responseStatus);  // Use parsed status byte
+
+      if (responseStatus == 0x00) {
+        NXPLOG_NCIHAL_D("NXP_BRODCAST_POLL_CMD Command success");
+      } else {
+        NXPLOG_NCIHAL_E(
+            "NXP_BRODCAST_POLL_CMD Command failed with status: 0x%02X",
+            responseStatus);
+      }
+    } else {
+      // Command sending failed
+      response.push_back(0x01);  // Error status
+      NXPLOG_NCIHAL_E("NXP_BRODCAST_POLL_CMD Command failed");
+    }
+  } else {
+    // Conversion failed
+    response.push_back(0x02);  // Conversion error status
+    NXPLOG_NCIHAL_E(
+        "NXP_BRODCAST_POLL_CMD conversion failed - invalid input data");
+  }
+
+  // Send response back via vendor specific callback
+  phNxpNciHal_vendorSpecificCallback(p_data[NCI_OID_INDEX],
+                                     p_data[NCI_MSG_INDEX_FOR_FEATURE],
+                                     std::move(response));
+
+  return data_len;
+}
+
+/*******************************************************************************
 **
 ** Function         phNxpNciHal_hndlVndSpecificAndroidCmd()
 **
@@ -926,6 +1011,10 @@ int phNxpNciHal_hndlVndSpecificAndroidCmd(uint16_t data_len,
              p_data[NCI_MSG_INDEX_FOR_FEATURE] == NCI_ANDROID_GET_CAPABILITY) {
     // 2F 0C 01 00 => GetCapability Command length is 4 Bytes
     return handleGetCapability(data_len, p_data);
+  } else if (data_len >= 4 && p_data[NCI_MSG_INDEX_FOR_FEATURE] ==
+                                  NCI_ANDROID_READER_ANNOTATION) {
+    // 2F 0C 0xXX 09 0xXX ... => Reader mode Annotation command
+    return handleReaderModeAnnotationCommand(data_len, p_data);
   } else {
     return phNxpNciHal_write_internal(data_len, p_data);
   }
@@ -941,17 +1030,18 @@ int phNxpNciHal_hndlVndSpecificAndroidCmd(uint16_t data_len,
 **
 *******************************************************************************/
 void phNxpNciHal_vendorSpecificCallback(int oid, int opcode,
-                                        vector<uint8_t> data) {
+                                        std::vector<uint8_t> data) {
   static phLibNfc_Message_t msg;
-  nxpncihal_ctrl.vendor_msg[0] = (uint8_t)(NCI_GID_PROP | NCI_MT_RSP);
+  nxpncihal_ctrl.vendor_msg[0] =
+      static_cast<uint8_t>(NCI_GID_PROP | NCI_MT_RSP);
   nxpncihal_ctrl.vendor_msg[1] = oid;
-  nxpncihal_ctrl.vendor_msg[2] = 1 + (int)data.size();
+  nxpncihal_ctrl.vendor_msg[2] = 1 + static_cast<int>(data.size());
   nxpncihal_ctrl.vendor_msg[3] = opcode;
-  if ((int)data.size() > 0) {
+  if (static_cast<int>(data.size()) > 0) {
     memcpy(&nxpncihal_ctrl.vendor_msg[4], data.data(),
            data.size() * sizeof(uint8_t));
   }
-  nxpncihal_ctrl.vendor_msg_len = 4 + (int)data.size();
+  nxpncihal_ctrl.vendor_msg_len = 4 + static_cast<int>(data.size());
 
   msg.eMsgType = NCI_HAL_VENDOR_MSG;
   msg.pMsgData = NULL;
@@ -959,8 +1049,7 @@ void phNxpNciHal_vendorSpecificCallback(int oid, int opcode,
   phNxpNciHal_print_packet("RECV", nxpncihal_ctrl.vendor_msg,
                            nxpncihal_ctrl.vendor_msg_len,
                            RfFwRegionDnld_handle == NULL);
-  phTmlNfc_DeferredCall(gpphTmlNfc_Context->dwCallbackThreadId,
-                        (phLibNfc_Message_t*)&msg);
+  phTmlNfc_DeferredCall(gpphTmlNfc_Context->dwCallbackThreadId, &msg);
 }
 
 /*******************************************************************************
@@ -1009,7 +1098,7 @@ int handleGetCapability(uint16_t data_len, const uint8_t* p_data) {
 
   // First byte is status is ok
   // next 2 bytes is version for Android requirements
-  vector<uint8_t> capability = {0x00, 0x00, 0x00};
+  std::vector<uint8_t> capability = {0x00, 0x00, 0x00};
   capability.push_back(5);  // 5 capability event's
   // Observe mode
   capability.push_back(nfcFL.nfccCap.OBSERVE_MODE.id);

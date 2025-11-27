@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 NXP
+ * Copyright 2022-2025 NXP
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ extern PowerTrackerHandle gPowerTrackerHandle;
 bool phNxpNciHal_isULPDetSupported() {
   unsigned long num = 0;
   if ((GetNxpNumValue(NAME_NXP_DEFAULT_ULPDET_MODE, &num, sizeof(num)))) {
-    if ((uint8_t)num > 0) {
+    if (static_cast<uint8_t>(num) > 0) {
       NXPLOG_NCIHAL_E("%s: NxpNci isULPDetSupported true", __func__);
       return true;
     }
@@ -63,7 +63,7 @@ bool phNxpNciHal_isULPDetSupported() {
 void phNxpNciHal_setULPDetFlag(bool flag) {
   nxpncihal_ctrl.isUlpdetModeEnabled = flag;
   if (gPowerTrackerHandle.stateChange != NULL) {
-    RefreshNfccPowerState state = (flag) ? ULPDET_ON : ULPDET_OFF;
+    const RefreshNfccPowerState state = (flag) ? ULPDET_ON : ULPDET_OFF;
     gPowerTrackerHandle.stateChange(state);
   }
 }

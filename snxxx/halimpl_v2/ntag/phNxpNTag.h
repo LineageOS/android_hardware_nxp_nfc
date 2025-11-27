@@ -104,6 +104,8 @@ struct NtagControl {
   IntervalTimer mNTagTimer;
   /* Response status for RF Idle/Discovery commands */
   NFCSTATUS mCmdRspStatus;
+  /* RF deactivate discovery flag */
+  bool mRfDeactDisc;
 };
 
 class NxpNTag {
@@ -174,6 +176,7 @@ class NxpNTag {
   constexpr static uint8_t NTAG_DETECT_TIMER_STATUS = 0x10;
   constexpr static uint8_t NTAG_PRESENCE_CHECK_TIMER_STATUS = 0x20;
   constexpr static uint8_t NTAG_PRESENCE_CHECK_TIMEOUT = 0x40;
+  constexpr static uint8_t NTAG_LOADCHANGE_TIMER_STATUS = 0x80;
 
   constexpr static uint8_t NTAG_DETECTION_OID = 0x03;
   constexpr static uint8_t NTAG_ENABLE_PROP_OID = 0x04;
@@ -301,7 +304,7 @@ class NxpNTag {
    * @return returns NFCSTATUS_EXTN_FEATURE_SUCCESS, if it is vendor specific
    * feature and handled it internally otherwise NFCSTATUS_EXTN_FEATURE_FAILURE.
    */
-  NFCSTATUS processRfDiscCmd(vector<uint8_t>& rfDiscCmd);
+  NFCSTATUS processRfDiscCmd(std::vector<uint8_t>& rfDiscCmd);
 
   /**
    * @brief Process NTag NCi responses
