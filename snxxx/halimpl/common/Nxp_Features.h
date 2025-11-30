@@ -16,6 +16,8 @@
  *
  ******************************************************************************/
 
+#include <android-base/properties.h>
+
 #include <stdint.h>
 
 #include <string>
@@ -299,12 +301,13 @@ extern tNfc_featureList nfcFL;
     }                                                                  \
   }
 
-#define STRCPY_FW_BIN(str)                       \
-  {                                              \
-    nfcFL._FW_BIN_PATH.clear();                  \
-    nfcFL._FW_BIN_PATH.append(FW_BIN_ROOT_DIR);  \
-    nfcFL._FW_BIN_PATH.append(str);              \
-    nfcFL._FW_BIN_PATH.append(FW_BIN_EXTENSION); \
+#define STRCPY_FW_BIN(str)                                                                 \
+  {                                                                                        \
+    nfcFL._FW_BIN_PATH.clear();                                                            \
+    nfcFL._FW_BIN_PATH.append(FW_BIN_ROOT_DIR);                                            \
+    auto fw_file_name = android::base::GetProperty("persist.vendor.nfc.fw_file_name", ""); \
+    nfcFL._FW_BIN_PATH.append(!fw_file_name.empty() ? fw_file_name : str);                 \
+    nfcFL._FW_BIN_PATH.append(FW_BIN_EXTENSION);                                           \
   }
 #define STRCPY_FW(str1)                          \
   {                                              \
