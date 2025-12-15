@@ -517,7 +517,9 @@ NFCSTATUS Mpos::processMposEvent(ScrState_t state) {
   }
   case MPOS_STATE_TRANSACTION_STARTED: {
     notifyTagActivated();
-    return NFCSTATUS_EXTN_FEATURE_SUCCESS;
+    // Interface Activated Ntf should be propagated to libnfc-nci layer
+    // so that MW state machine will be in sync with FW state machine.
+    return NFCSTATUS_EXTN_FEATURE_FAILURE;
   }
   case MPOS_STATE_NOTIFY_STOP_RF_DISCOVERY: {
     updateState(MPOS_STATE_WAIT_FOR_RF_DEACTIVATION);
@@ -536,12 +538,9 @@ NFCSTATUS Mpos::processMposEvent(ScrState_t state) {
   case MPOS_STATE_SE_READER_STOPPED: {
     mCurrentTimeoutCount = 0x00; /* Card removed - clear the flag*/
     notifyRfDiscoveryStopped();
-    if (isActivatedNfcRcv == false) {
-      return NFCSTATUS_EXTN_FEATURE_FAILURE;
-    } else {
-      isActivatedNfcRcv = false;
-      return NFCSTATUS_EXTN_FEATURE_SUCCESS;
-    }
+    isActivatedNfcRcv = false;
+    // DEACTIVATE_RSP/NTF should be propagated to libnfc-nci layer.
+    return NFCSTATUS_EXTN_FEATURE_FAILURE;
   }
   case MPOS_STATE_SEND_PROFILE_DESELECT_CONFIG_CMD: {
     sendDeselectProfileCmd();

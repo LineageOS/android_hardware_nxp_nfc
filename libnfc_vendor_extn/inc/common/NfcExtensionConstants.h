@@ -185,6 +185,7 @@ constexpr uint8_t NCI_EE_MODE_SET_OID = 0x01;
 constexpr uint8_t NCI_EE_STATUS_OID = 0x02;
 constexpr uint8_t NCI_POWER_LINK_OID = 0x03;
 constexpr uint8_t NCI_RF_DISCOVERY_OID = 0x03;
+constexpr uint8_t NCI_RF_DISCOVERY_TYPE_IDLE = 0x00;
 constexpr uint8_t NCI_RF_INTF_ACT_OID = 0x05;
 constexpr uint8_t NCI_RF_DEACTIVATE_OID = 0x06;
 constexpr uint8_t NCI_CORE_GENERIC_ERROR_OID = 0x07;

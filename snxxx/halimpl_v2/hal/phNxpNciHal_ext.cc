@@ -42,8 +42,8 @@
 #define NXP_EN_SN300U 1
 #define NXP_EN_SN330U 1
 #define NXP_NDEF_TAG_EMULATION_LOGICAL_CHANNEL 5
-#define NFC_NXP_MW_ANDROID_VER (16U)  /* Android version used by NFC MW */
-#define NFC_NXP_MW_VERSION_MAJ (0x0A) /* MW Major Version */
+#define NFC_NXP_MW_ANDROID_VER (17U)  /* Android version used by NFC MW */
+#define NFC_NXP_MW_VERSION_MAJ (0x02) /* MW Major Version */
 #define NFC_NXP_MW_VERSION_MIN (0x00) /* MW Minor Version */
 #define NFC_NXP_MW_CUSTOMER_ID (0x00) /* MW Customer Id */
 #define NFC_NXP_MW_RC_VERSION (0x00)  /* MW RC Version */
@@ -537,6 +537,10 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
                                                       uint16_t* p_len) {
   NFCSTATUS status = NFCSTATUS_SUCCESS;
   bool is_abort_req = false;
+  char vendorName = 'N';
+  char result[15];
+  uint8_t rfFileVer[2] = {0x00};
+
   /* Parsing CORE_RESET_RSP and CORE_RESET_NTF to update NCI version.*/
   if (p_ntf == NULL || *p_len < 2) {
     return NFCSTATUS_FAILED;
@@ -593,6 +597,16 @@ static NFCSTATUS phNxpNciHal_ext_process_nfc_init_rsp(uint8_t* p_ntf,
                   ((static_cast<uint32_t>(p_ntf[len - 1])) << 8U) | p_ntf[len];
       NXPLOG_NCIHAL_D("NxpNci> FW Version: %x.%x.%x", p_ntf[len - 2],
                       p_ntf[len - 1], p_ntf[len]);
+      long retlen = 0;
+      bool isfound = GetNxpByteArrayValue(NAME_NXP_RF_FILE_VERSION_INFO,
+             reinterpret_cast<char*>(rfFileVer), sizeof(rfFileVer), &retlen);
+      if ((!isfound) || (retlen != 0x02)) {
+        NXPLOG_NCIHAL_E("%s NXP_RF_FILE_VERSION_INFO not found. retlen %ld", __func__, retlen);
+      }
+      snprintf(result, sizeof(result), "%c%02X.%02X.%02X.%02X", vendorName,
+          p_ntf[len - 2], p_ntf[len - 1], p_ntf[len], rfFileVer[1]);
+      NXPLOG_NCIHAL_D( "%s nfc.fw.ver [ %s ]", __func__, result);
+      phNxpNciHal_setVendorProp("nfc.fw.ver", result);
     } else {
       if ((p_ntf[3] == CORE_RESET_TRIGGER_TYPE_WATCHDOG_RESET ||
            p_ntf[3] == CORE_RESET_TRIGGER_TYPE_FW_ASSERT) ||
@@ -1008,76 +1022,6 @@ NFCSTATUS phNxpNciHal_write_ext(uint16_t* cmd_len, uint8_t* p_cmd_data,
     phNxpNciHal_print_packet("RECV", p_rsp_data, 5);
     //        status = NFCSTATUS_FAILED;
     NXPLOG_NCIHAL_D("> Going through workaround - Dirty Set Config - End ");
-  }
-#if 0
-    else if ( (p_cmd_data[0] == 0x20 && p_cmd_data[1] == 0x02 ) &&
-                 ((p_cmd_data[2] == 0x09 && p_cmd_data[3] == 0x04) ||
-                     (p_cmd_data[2] == 0x0B && p_cmd_data[3] == 0x05) ||
-                     (p_cmd_data[2] == 0x07 && p_cmd_data[3] == 0x02) ||
-                     (p_cmd_data[2] == 0x0A && p_cmd_data[3] == 0x03) ||
-                     (p_cmd_data[2] == 0x0A && p_cmd_data[3] == 0x04) ||
-                     (p_cmd_data[2] == 0x05 && p_cmd_data[3] == 0x02))
-             )
-    {
-        NXPLOG_NCIHAL_D ("> Going through workaround - Dirty Set Config ");
-        phNxpNciHal_print_packet("SEND", p_cmd_data, *cmd_len);
-        *rsp_len = 5;
-        p_rsp_data[0] = 0x40;
-        p_rsp_data[1] = 0x02;
-        p_rsp_data[2] = 0x02;
-        p_rsp_data[3] = 0x00;
-        p_rsp_data[4] = 0x00;
-
-        phNxpNciHal_print_packet("RECV", p_rsp_data, 5);
-        status = NFCSTATUS_FAILED;
-        NXPLOG_NCIHAL_D ("> Going through workaround - Dirty Set Config - End ");
-    }
-
-    else if((p_cmd_data[0] == 0x20 && p_cmd_data[1] == 0x02) &&
-           ((p_cmd_data[3] == 0x00) ||
-           ((*cmd_len >= 0x06) && (p_cmd_data[5] == 0x00)))) /*If the length of the first param id is zero don't allow*/
-    {
-        NXPLOG_NCIHAL_D ("> Going through workaround - Dirty Set Config ");
-        phNxpNciHal_print_packet("SEND", p_cmd_data, *cmd_len);
-        *rsp_len = 5;
-        p_rsp_data[0] = 0x40;
-        p_rsp_data[1] = 0x02;
-        p_rsp_data[2] = 0x02;
-        p_rsp_data[3] = 0x00;
-        p_rsp_data[4] = 0x00;
-
-        phNxpNciHal_print_packet("RECV", p_rsp_data, 5);
-        status = NFCSTATUS_FAILED;
-        NXPLOG_NCIHAL_D ("> Going through workaround - Dirty Set Config - End ");
-    }
-#endif
-  else if ((wFwVerRsp & 0x0000FFFF) == wFwVer) {
-    /* skip CORE_RESET and CORE_INIT from Brcm */
-    if (p_cmd_data[0] == 0x20 && p_cmd_data[1] == 0x00 &&
-        p_cmd_data[2] == 0x01 && p_cmd_data[3] == 0x01) {
-      //            *rsp_len = 6;
-      //
-      //            NXPLOG_NCIHAL_D("> Going - core reset optimization");
-      //
-      //            p_rsp_data[0] = 0x40;
-      //            p_rsp_data[1] = 0x00;
-      //            p_rsp_data[2] = 0x03;
-      //            p_rsp_data[3] = 0x00;
-      //            p_rsp_data[4] = 0x10;
-      //            p_rsp_data[5] = 0x01;
-      //
-      //            status = NFCSTATUS_FAILED;
-      //            NXPLOG_NCIHAL_D("> Going - core reset optimization - END");
-    }
-    /* CORE_INIT */
-    else if (p_cmd_data[0] == 0x20 && p_cmd_data[1] == 0x01 &&
-             p_cmd_data[2] == 0x00) {
-      //            NXPLOG_NCIHAL_D("> Going - core init optimization");
-      //            *rsp_len = iCoreInitRspLen;
-      //            memcpy(p_rsp_data, bCoreInitRsp, iCoreInitRspLen);
-      //            status = NFCSTATUS_FAILED;
-      //            NXPLOG_NCIHAL_D("> Going - core init optimization - END");
-    }
   }
   if (!phNxpTempMgr::GetInstance().IsICTempOk()) {
     NXPLOG_NCIHAL_E("> IC Temp is NOK");

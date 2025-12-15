@@ -185,6 +185,7 @@ static NFCSTATUS phNxpNciHal_getChipInfoInFwDnldMode(
 static uint8_t phNxpNciHal_getSessionInfoInFwDnldMode();
 static NFCSTATUS phNxpNciHal_dlResetInFwDnldMode();
 static void phNxpNciHal_check_and_recover_fw();
+static void phNxpNciHal_clean_resources();
 
 /******************************************************************************
  * Function         onLoadLibrary
@@ -774,15 +775,35 @@ int phNxpNciHal_MinOpen() {
 
     if ((status != NFCSTATUS_SUCCESS && fw_download_success) ||
         (gsIsFwRecoveryRequired && (fw_update_req || gsIsFirstHalMinOpen))) {
+      // case: FW download success, but post operation failed.
+      //       or fw recovery is requested
       NXPLOG_NCIHAL_E(
           "FW Recovery required, Perform Force FW Download "
           "gsIsFwRecoveryRequired %d",
           gsIsFwRecoveryRequired);
       fw_update_req = 1;
       dnld_retry_cnt++;
-    } else if (status != NFCSTATUS_SUCCESS) {
-      return phNxpNciHal_MinOpen_Clean(&nfc_dev_node);
+    } else if (status != NFCSTATUS_SUCCESS && !fw_download_success) {
+      // Case: Both FW download and post operation failed
+      NXPLOG_NCIHAL_E("FW Teardown, Perform Force FW Download");
+      fw_update_req = 1;
+      dnld_retry_cnt++;
+      bIsNfccDlState = true;
+      if (dnld_retry_cnt <= 1) {
+        NXPLOG_NCIHAL_E("Doing VEN Toggle before FW download retry");
+        if (phTmlNfc_IoCtl(phTmlNfc_e_EnableDownloadModeWithVenRst) !=
+            NFCSTATUS_SUCCESS) {
+          NXPLOG_NCIHAL_E("VEN Toggle failed");
+          phNxpNciHal_clean_resources();
+          return phNxpNciHal_MinOpen_Clean(&nfc_dev_node);
+        }
+      } else {
+        NXPLOG_NCIHAL_E("FW download retry failed, cleanup resources");
+        phNxpNciHal_clean_resources();
+        return phNxpNciHal_MinOpen_Clean(&nfc_dev_node);
+      }
     } else {
+      // Case: FW download success
       if (sIsHalOpenErrorRecovery) {
         NXPLOG_NCIHAL_D(
             "Applying config settings as FW download recovery done");
@@ -3926,11 +3947,7 @@ void phNxpNciHal_deinitializeRegRfFwDnld() {
  *
  *****************************************************************************/
 
-void phNxpNciHal_setVerboseLogging(bool enable) {
-  nfc_debug_enabled = enable;
-  property_set("persist.vendor.nfc.nxp.lx_debug_mask",
-               enable ? "0x2017" : "0x0");
-}
+void phNxpNciHal_setVerboseLogging(bool enable) { nfc_debug_enabled = enable; }
 
 /******************************************************************************
  * Function         phNxpNciHal_getVerboseLogging

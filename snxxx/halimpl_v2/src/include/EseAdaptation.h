@@ -23,7 +23,6 @@
 #include "NxpNfcThreadMutex.h"
 #include "ese_hal_api.h"
 #include "hal_nxpese.h"
-using vendor::nxp::nxpese::V1_0::INxpEse;
 
 class EseAdaptation {
  public:

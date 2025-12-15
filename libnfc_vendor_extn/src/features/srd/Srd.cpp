@@ -299,7 +299,9 @@ NFCSTATUS Srd::processPwrLinkDefRsp(const std::vector<uint8_t> &pRspBuffer) {
 NFCSTATUS Srd::processDiscStopResp(const std::vector<uint8_t> &pRspBuffer) {
   NXPLOG_EXTNS_D(NXPLOG_ITEM_NXP_GEN_EXTN, "%s: enter", __func__);
   const uint16_t mGidOid = ((pRspBuffer[0] << 8) | pRspBuffer[1]);
-  if (mGidOid == NCI_RF_DISC_STOP_RSP_GID_OID) {
+  const uint8_t mDiscoveryType = pRspBuffer[3];
+  if (mGidOid == NCI_RF_DISC_STOP_RSP_GID_OID &&
+      mDiscoveryType == NCI_RF_DISCOVERY_TYPE_IDLE) {
     NXPLOG_EXTNS_D(NXPLOG_ITEM_NXP_GEN_EXTN,
                    "%s: sendDefaultDiscoverMapCmd enter", __func__);
     mDiscStopResp.clear();
@@ -611,7 +613,9 @@ bool Srd::checkStopDiscCmd(uint16_t *dataLen, uint8_t *pData) {
   if (mState == SRD_STATE_STOP_IN_PROGRESS) {
     if (*dataLen > 1) {
       const uint16_t gidOid = ((pData[0] << 8) | pData[1]);
-      if (gidOid == NCI_RF_DISC_STOP_CMD_GID_OID) {
+      const uint8_t mDiscoveryType = pData[3];
+      if (gidOid == NCI_RF_DISC_STOP_CMD_GID_OID &&
+          mDiscoveryType == NCI_RF_DISCOVERY_TYPE_IDLE) {
         NXPLOG_EXTNS_D(NXPLOG_ITEM_NXP_GEN_EXTN, "%s: enter", __func__);
         return true;
       }
