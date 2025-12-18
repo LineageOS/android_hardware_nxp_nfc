@@ -30,8 +30,6 @@
 #include "eSEClientExtns.h"
 #include "phNxpNciHal_IoctlOperations.h"
 
-using std::vector;
-
 /********************* Definitions and structures *****************************/
 #define MAX_RETRY_COUNT 5
 #define NCI_MAX_DATA_LEN 300
@@ -245,7 +243,7 @@ typedef struct phNxpNciClock {
 
 typedef struct phNxpNciRfSetting {
   bool_t isGetRfSetting;
-  vector<uint8_t> p_rx_data;
+  std::vector<uint8_t> p_rx_data;
 } phNxpNciRfSetting_t;
 
 typedef struct phNxpNciMwEepromArea {
@@ -375,7 +373,6 @@ typedef struct phNxpNciProfile_Control {
 
 /* Internal messages to handle callbacks */
 #define NCI_HAL_OPEN_CPLT_MSG 0x411
-#define NCI_HAL_CLOSE_CPLT_MSG 0x412
 #define NCI_HAL_POST_INIT_CPLT_MSG 0x413
 #define NCI_HAL_PRE_DISCOVER_CPLT_MSG 0x414
 #define NCI_HAL_ERROR_MSG 0x415

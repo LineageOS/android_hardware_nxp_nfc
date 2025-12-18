@@ -52,7 +52,7 @@ typedef struct NfcPkt {
       data = NULL;
       return;
     }
-    data = (uint8_t*)calloc(1, len);
+    data = static_cast<uint8_t*>(calloc(1, len));
     if (data != NULL) {
       memcpy(data, inData, len);
     }
@@ -72,12 +72,11 @@ typedef union WiredSeEvtData {
   // Default
   WiredSeEvtData() {}
   // For typecasting from NfcState to WiredSeEvtData
-  WiredSeEvtData(NfcState inNfcState) { nfcState = inNfcState; }
+  explicit WiredSeEvtData(NfcState inNfcState) { nfcState = inNfcState; }
   // For typecasting from NfcPkt to WiredSeEvtData
-  WiredSeEvtData(std::shared_ptr<NfcPkt> inNfcPkt) { nfcPkt = inNfcPkt; }
-  WiredSeEvtData(const WiredSeEvtData& evtData) {
+  explicit WiredSeEvtData(std::shared_ptr<NfcPkt> inNfcPkt) : nfcPkt(inNfcPkt) {}
+  WiredSeEvtData(const WiredSeEvtData& evtData) : nfcPkt(evtData.nfcPkt) {
     nfcState = evtData.nfcState;
-    nfcPkt = evtData.nfcPkt;
   }
   WiredSeEvtData& operator=(const WiredSeEvtData& evtData) {
     nfcState = evtData.nfcState;
@@ -92,9 +91,8 @@ typedef struct WiredSeEvt {
   WiredSeEvtData eventData;
 
   WiredSeEvt() { event = NFC_EVT_UNKNOWN; }
-  WiredSeEvt(const WiredSeEvt& evt) {
+  WiredSeEvt(const WiredSeEvt& evt) : eventData(evt.eventData) {
     event = evt.event;
-    eventData = evt.eventData;
   }
   ~WiredSeEvt() {}
 } WiredSeEvt;

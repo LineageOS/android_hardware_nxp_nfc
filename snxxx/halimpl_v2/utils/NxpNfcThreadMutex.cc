@@ -131,7 +131,9 @@ void NfcHalThreadCondVar::timedWait(struct timespec* time) {
 *******************************************************************************/
 void NfcHalThreadCondVar::timedWait(uint8_t sec) {
   struct timespec timeout_spec;
-  clock_gettime(CLOCK_MONOTONIC, &timeout_spec);
+  if (clock_gettime(CLOCK_MONOTONIC, &timeout_spec) == -1) {
+    LOG(ERROR) << StringPrintf("%s Fail to get time errno=0x%X", __func__, errno);
+  }
   timeout_spec.tv_sec += sec;
   pthread_cond_timedwait(&mCondVar, *this, &timeout_spec);
 }
@@ -146,7 +148,7 @@ void NfcHalThreadCondVar::timedWait(uint8_t sec) {
 **
 *******************************************************************************/
 void NfcHalThreadCondVar::signal() {
-  NfcHalAutoThreadMutex a(*this);
+  const NfcHalAutoThreadMutex a(*this);
   pthread_cond_signal(&mCondVar);
 }
 

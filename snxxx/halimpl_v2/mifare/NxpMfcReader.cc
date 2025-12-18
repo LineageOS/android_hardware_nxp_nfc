@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  Copyright 2019-2023 NXP
+ *  Copyright 2019-2023,2025 NXP
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ int NxpMfcReader::Write(uint16_t mfcDataLen, const uint8_t* pMfcData) {
   // Eg:- From the App pMfcData- {|PART1-00 00 06 C1 04| PART2-01 00 00 00|}
   uint16_t mfcTagCmdBuffLen = 0;
   uint8_t mfcTagCmdBuff[MAX_MFC_BUFF_SIZE] = {0};
-  uint16_t mfcTagCmdRemainingCmdLen = mfcDataLen;
+  const uint16_t mfcTagCmdRemainingCmdLen = mfcDataLen;
 
   if (mfcDataLen > MAX_MFC_BUFF_SIZE) {
     android_errorWriteLog(0x534e4554, "169259605");
@@ -69,7 +69,7 @@ int NxpMfcReader::Write(uint16_t mfcDataLen, const uint8_t* pMfcData) {
       return 0;
     }
   }
-  int writtenDataLen = phNxpNciHal_write_internal(
+  const int writtenDataLen = phNxpNciHal_write_internal(
       mfcTagCmdBuffLen + NCI_HEADER_SIZE, mfcTagCmdBuff);
 
   /* send TAG_CMD part 2 for Mifare increment ,decrement and restore commands */
@@ -98,7 +98,7 @@ int NxpMfcReader::Write(uint16_t mfcDataLen, const uint8_t* pMfcData) {
 **
 *******************************************************************************/
 void NxpMfcReader::BuildMfcCmd(uint8_t* pData, uint16_t* pLength) {
-  uint16_t cmdBuffLen = *pLength;
+  const uint16_t cmdBuffLen = *pLength;
   memcpy(mMfcTagCmdIntfData.sendBuf, pData, cmdBuffLen);
   mMfcTagCmdIntfData.sendBufLen = cmdBuffLen;
 
@@ -179,11 +179,11 @@ void NxpMfcReader::BuildAuthCmd() {
 **
 *******************************************************************************/
 void NxpMfcReader::CalcSectorAddress() {
-  uint8_t BlockNumber = mMfcTagCmdIntfData.sendBuf[1];
+  const uint8_t BlockNumber = mMfcTagCmdIntfData.sendBuf[1];
   if (BlockNumber >= MFC_4K_BLK128) {
     mMfcTagCmdIntfData.byAddr =
-        (uint8_t)(MFC_SECTOR_NO32 +
-                  ((BlockNumber - MFC_4K_BLK128) / MFC_BYTES_PER_BLOCK));
+        static_cast<uint8_t>(MFC_SECTOR_NO32 + ((BlockNumber - MFC_4K_BLK128) /
+                                                MFC_BYTES_PER_BLOCK));
   } else {
     mMfcTagCmdIntfData.byAddr = BlockNumber / MFC_BLKS_PER_SECTOR;
   }
@@ -287,12 +287,13 @@ void NxpMfcReader::AuthForWrite() {
   NFCSTATUS status = NFCSTATUS_FAILED;
   uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
   uint16_t rsp_len = 0;
-  uint8_t authForWriteBuff[] = {0x00,
-                                0x00,
-                                0x03,
-                                (uint8_t)eMfRawDataXchgHdr,
-                                (uint8_t)mMfcTagCmdIntfData.sendBuf[0],
-                                (uint8_t)mMfcTagCmdIntfData.sendBuf[1]};
+  uint8_t authForWriteBuff[] = {
+      0x00,
+      0x00,
+      0x03,
+      static_cast<uint8_t>(eMfRawDataXchgHdr),
+      static_cast<uint8_t>(mMfcTagCmdIntfData.sendBuf[0]),
+      static_cast<uint8_t>(mMfcTagCmdIntfData.sendBuf[1])};
 
   status = phNxpNciHal_send_ext_cmd(
       sizeof(authForWriteBuff) / sizeof(authForWriteBuff[0]), authForWriteBuff,
@@ -320,8 +321,9 @@ void NxpMfcReader::SendIncDecRestoreCmdPart2(uint16_t mfcDataLen,
   uint16_t rsp_len = 0;
 
   /* Build TAG_CMD part 2 for Mifare increment ,decrement and restore commands*/
-  uint8_t incDecRestorePart2[] = {0x00, 0x00, 0x05, (uint8_t)eMfRawDataXchgHdr,
-                                  0x00, 0x00, 0x00, 0x00};
+  uint8_t incDecRestorePart2[] = {
+      0x00, 0x00, 0x05, static_cast<uint8_t>(eMfRawDataXchgHdr),
+      0x00, 0x00, 0x00, 0x00};
   uint8_t incDecRestorePart2Size =
       (sizeof(incDecRestorePart2) / sizeof(incDecRestorePart2[0]));
   if (mfcData[3] == eMifareInc || mfcData[3] == eMifareDec) {
@@ -367,7 +369,7 @@ NFCSTATUS NxpMfcReader::AnalyzeMfcResp(uint8_t* pBuff, uint16_t* pBufflen) {
   if (0 == (*pBufflen)) {
     status = NFCSTATUS_FAILED;
   } else {
-    RecvdExtnRspId = (MfcRespId_t)pBuff[0];
+    RecvdExtnRspId = static_cast<MfcRespId_t>(pBuff[0]);
     NXPLOG_NCIHAL_E("%s: RecvdExtnRspId=%d", __func__, RecvdExtnRspId);
     switch (RecvdExtnRspId) {
       case eMfXchgDataRsp: {
@@ -503,10 +505,13 @@ void NxpMfcReader::MfcNotifyOnAckReceived(uint8_t* buff) {
 *******************************************************************************/
 NFCSTATUS NxpMfcReader::MfcWaitForAck() {
   NFCSTATUS status = NFCSTATUS_FAILED;
-  int sem_timedout = 2, s;
+  const int sem_timedout = 2;
+  int s;
   struct timespec ts;
   isAck = false;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+    NXPLOG_NCIHAL_E("%s Fail get time; errno=0x%X", __func__, errno);
+  }
   ts.tv_sec += sem_timedout;
   while ((s = sem_timedwait_monotonic_np(&mNacksem, &ts)) == -1 &&
          errno == EINTR) {

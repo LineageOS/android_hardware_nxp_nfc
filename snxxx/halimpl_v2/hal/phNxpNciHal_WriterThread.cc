@@ -21,8 +21,7 @@
 
 #include "NfcExtension.h"
 
-phNxpNciHal_WriterThread::phNxpNciHal_WriterThread() : thread_running(false) {
-  writer_thread = 0;
+phNxpNciHal_WriterThread::phNxpNciHal_WriterThread() : writer_thread(0), thread_running(false) {
   writer_queue = 0;
 }
 
@@ -45,10 +44,12 @@ bool phNxpNciHal_WriterThread::Start() {
       NXPLOG_NCIHAL_E("%s:Failed to create writer queue", __func__);
       return false;
     }
-    int val = pthread_create(&writer_thread, NULL,
+    const int val = pthread_create(&writer_thread, NULL,
                              phNxpNciHal_WriterThread::WriterThread, this);
     if (val != 0) {
       thread_running.store(false);
+      phDal4Nfc_msgdestroy(writer_queue);
+      writer_queue = 0;
       NXPLOG_NCIHAL_E("%s:pthread_create failed", __func__);
       return false;
     }
@@ -83,14 +84,17 @@ bool phNxpNciHal_WriterThread::Post(phLibNfc_Message_t& msg) {
 bool phNxpNciHal_WriterThread::Stop() {
   if (thread_running.load()) {
     thread_running.store(false);
-    phDal4Nfc_msgrelease(writer_queue);
-    writer_queue = 0;
-    if ((thread_running.load()) &&
-        (pthread_join(writer_thread, (void**)NULL) != 0)) {
+    phDal4Nfc_msgsempost(writer_queue);
+    if (pthread_join(writer_thread, static_cast<void**>(NULL)) != 0) {
       NXPLOG_NCIHAL_E("%s:pthread_join failed", __func__);
+      phDal4Nfc_msgdestroy(writer_queue);
+      writer_queue = 0;
       return false;
     }
     writer_thread = 0;
+    phDal4Nfc_msgdestroy(writer_queue);
+    writer_queue = 0;
+    NXPLOG_NCIHAL_D("WriterThread stopped");
   }
   return true;
 }
@@ -118,8 +122,11 @@ void phNxpNciHal_WriterThread::Run() {
     switch (msg.eMsgType) {
       case NCI_HAL_TML_WRITE_MSG: {
         NXPLOG_NCIHAL_D("%s: Received NCI_HAL_TML_WRITE_MSG", __func__);
-        uint32_t bytesWritten = phNxpNciHal_write_unlocked(
-            (uint16_t)msg.Size, (uint8_t*)msg.data, ORIG_EXTNS);
+        CONCURRENCY_LOCK();
+        const uint32_t bytesWritten = phNxpNciHal_write_unlocked(
+            static_cast<uint16_t>(msg.Size), static_cast<uint8_t*>(msg.data),
+            ORIG_EXTNS);
+        CONCURRENCY_UNLOCK();
         if (bytesWritten == msg.Size) {
           phNxpExtn_WriteCompleteStatusUpdate(NFCSTATUS_SUCCESS);
         } else {
@@ -132,8 +139,11 @@ void phNxpNciHal_WriterThread::Run() {
         phNxpExtn_NfcHalControlGranted();
         break;
       }
+      default: {
+        NXPLOG_NCIHAL_E("Unexpected msg type");
+        break;
+      }
     }
   }
-  NXPLOG_NCIHAL_D("WriterThread stopped");
   return;
 }
