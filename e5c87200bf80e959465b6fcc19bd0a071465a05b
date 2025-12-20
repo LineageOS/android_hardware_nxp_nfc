@@ -16,6 +16,24 @@
       "message": "Works fine on salami.",
       "revId": "e5c87200bf80e959465b6fcc19bd0a071465a05b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a4a81ffa_9f0200a8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2025-12-20T23:49:28Z",
+      "side": 1,
+      "message": "```\n12-20 23:48:05.304   925  3762 D NxpHal  : processChipType Product : sn100\n12-20 23:48:05.306   925   986 D android.hardware.nfc-service.nxp: Fw_Lib_Path\u003d/vendor/firmware/sn100u_22861.bin\n```",
+      "parentUuid": "c2319b35_7214b952",
+      "revId": "e5c87200bf80e959465b6fcc19bd0a071465a05b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
