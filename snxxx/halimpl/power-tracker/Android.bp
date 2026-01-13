@@ -17,6 +17,7 @@ sysprop_library {
 cc_library_shared {
     name: "power_tracker",
     proprietary: true,
+    enabled: false,
     cflags: [
         "-Wall",
         "-Werror",
@@ -34,19 +35,19 @@ cc_library_shared {
         "libbase",
         "libbinder_ndk",
         "//hardware/google/pixel:pixel_stateresidency_provider_aidl_interface-ndk",
-        "vendor.nxp.nxpnfc@2.0",  // This is added to avoid compilation error
+        "vendor.nxp.nxpnfc@2.0", // This is added to avoid compilation error
     ],
     header_libs: [
         "nfc_nci_nxp_snxxx_headers",
-        "libhardware_headers"
+        "libhardware_headers",
     ],
     static_libs: ["libNfcProps"],
 }
 
 cc_library_headers {
-  name: "power_tracker_headers",
-  vendor: true,
-  export_include_dirs: [
-    "include",
-  ],
+    name: "power_tracker_headers",
+    vendor: true,
+    export_include_dirs: [
+        "include",
+    ],
 }
