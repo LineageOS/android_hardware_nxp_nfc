@@ -50,6 +50,24 @@
       "message": "Also, this repo comes from AOSP and NXP themselves, so it will affect literally every device out there.",
       "revId": "aa0405dbee6ade0764b05636935c31154c783985",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2c4c1b9c_317cb568",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 35850
+      },
+      "writtenOn": "2026-01-25T18:59:08Z",
+      "side": 1,
+      "message": "I know. But since we have it forked, why not do this too?",
+      "parentUuid": "d00ecc35_e7dd0d42",
+      "revId": "aa0405dbee6ade0764b05636935c31154c783985",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
