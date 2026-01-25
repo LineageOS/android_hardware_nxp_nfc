@@ -16,6 +16,23 @@
       "message": "requires existing devices to migrate.",
       "revId": "aa0405dbee6ade0764b05636935c31154c783985",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ff67b139_734a550d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 35850
+      },
+      "writtenOn": "2026-01-25T18:51:12Z",
+      "side": 1,
+      "message": "Is it really a problem? 23.2 doesn\u0027t ship yet.",
+      "revId": "aa0405dbee6ade0764b05636935c31154c783985",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
