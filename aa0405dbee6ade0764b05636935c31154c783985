@@ -104,6 +104,24 @@
       "parentUuid": "f7dfa2f1_6de8cf46",
       "revId": "aa0405dbee6ade0764b05636935c31154c783985",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b1bb0e95_a1e952ca",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2026-01-25T19:12:46Z",
+      "side": 1,
+      "message": "soong bool changes were made long before .2 was even branched + soong bool changes error at the beginning of build, where as this will just silently break devices.",
+      "parentUuid": "4d010df9_8f0bf764",
+      "revId": "aa0405dbee6ade0764b05636935c31154c783985",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
