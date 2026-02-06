@@ -22,6 +22,7 @@
 #include <phNxpNciHal.h>
 #include "NfcWriter.h"
 #include "ObserveMode.h"
+#include "phNxpNciHal_WiredSeIface.h"
 #include "phNxpNciHal_WriterThread.h"
 #include "phNxpNciHal_ext.h"
 
@@ -58,6 +59,7 @@ std::string mLibPathName = "/system/vendor/lib/" + mLibName;
 #endif
 
 extern phNxpNciHal_WriterThread& g_writerThread;
+extern WiredSeHandle* gWiredSeHandle;
 
 void phNxpExtn_LibSetup() {
   NXPLOG_NCIHAL_D("%s Enter", __func__);
@@ -172,7 +174,7 @@ NFCSTATUS phNxpExtn_HandleNciMsg(uint16_t* dataLen, const uint8_t* pData) {
   nfc_ext_event_data.nci_msg = nci_data;
 
   if (fp_extn_handle_nfc_event != NULL)
-    return fp_extn_handle_nfc_event(HANDLE_VENDOR_NCI_MSG, &nfc_ext_event_data);
+    return fp_extn_handle_nfc_event(HANDLE_VENDOR_NCI_MSG, nfc_ext_event_data);
   else
     return NFCSTATUS_EXTN_FEATURE_FAILURE;
 }
@@ -182,7 +184,7 @@ NFCSTATUS phNxpExtn_HandleHalEvent(uint8_t handle_event) {
   nfc_ext_event_data.hal_event = handle_event;
 
   if (fp_extn_handle_nfc_event != NULL) {
-    return fp_extn_handle_nfc_event(HANDLE_HAL_EVENT, &nfc_ext_event_data);
+    return fp_extn_handle_nfc_event(HANDLE_HAL_EVENT, nfc_ext_event_data);
   } else {
     return NFCSTATUS_EXTN_FEATURE_FAILURE;
   }
@@ -192,7 +194,7 @@ void phNxpExtn_WriteCompleteStatusUpdate(NFCSTATUS status) {
   NXPLOG_NCIHAL_D("%s Enter status:%d", __func__, status);
   nfc_ext_event_data.write_status = status;
   if (fp_extn_handle_nfc_event != NULL) {
-    fp_extn_handle_nfc_event(HANDLE_WRITE_COMPLETE_STATUS, &nfc_ext_event_data);
+    fp_extn_handle_nfc_event(HANDLE_WRITE_COMPLETE_STATUS, nfc_ext_event_data);
   }
 }
 
@@ -207,7 +209,7 @@ NFCSTATUS phNxpExtn_HandleNciRspNtf(uint16_t* dataLen, const uint8_t* pData) {
   if (fp_extn_handle_nfc_event != NULL) {
     if (NFCSTATUS_EXTN_FEATURE_SUCCESS !=
         fp_extn_handle_nfc_event(HANDLE_VENDOR_NCI_RSP_NTF,
-                                 &nfc_ext_event_data)) {
+                                 nfc_ext_event_data)) {
       return NFCSTATUS_EXTN_FEATURE_FAILURE;
     }
   } else {
@@ -220,30 +222,22 @@ void phNxpExtn_FwDnldStatusUpdate(uint8_t status) {
   NXPLOG_NCIHAL_D("%s Enter status:%d", __func__, status);
   nfc_ext_event_data.hal_event_status = status;
   if (fp_extn_handle_nfc_event != NULL) {
-    fp_extn_handle_nfc_event(HANDLE_FW_DNLD_STATUS_UPDATE, &nfc_ext_event_data);
+    fp_extn_handle_nfc_event(HANDLE_FW_DNLD_STATUS_UPDATE, nfc_ext_event_data);
   }
-}
-
-NfcRfState_t phNxpExtn_NfcGetRfState() {
-  NXPLOG_NCIHAL_D("%s Enter", __func__);
-  if (fp_extn_handle_nfc_event != NULL) {
-    fp_extn_handle_nfc_event(HANDLE_RF_HAL_STATE_UPDATE, &nfc_ext_event_data);
-  }
-  return static_cast<NfcRfState_t>(nfc_ext_event_data.rf_state);
 }
 
 void phNxpExtn_NfcHalStateUpdate(uint8_t state) {
   NXPLOG_NCIHAL_D("%s Enter state:%d", __func__, state);
   nfc_ext_event_data.hal_state = state;
   if (fp_extn_handle_nfc_event != NULL) {
-    fp_extn_handle_nfc_event(HANDLE_NFC_HAL_STATE_UPDATE, &nfc_ext_event_data);
+    fp_extn_handle_nfc_event(HANDLE_NFC_HAL_STATE_UPDATE, nfc_ext_event_data);
   }
 }
 
 void phNxpExtn_NfcHalControlGranted() {
   NXPLOG_NCIHAL_D("%s Enter", __func__);
   if (fp_extn_handle_nfc_event != NULL) {
-    fp_extn_handle_nfc_event(HANDLE_HAL_CONTROL_GRANTED, &nfc_ext_event_data);
+    fp_extn_handle_nfc_event(HANDLE_HAL_CONTROL_GRANTED, nfc_ext_event_data);
   }
 }
 
@@ -303,6 +297,16 @@ void phNxpHal_NfcDataCallback(uint16_t dataLen, const uint8_t* pData) {
   }
 }
 
+NFCSTATUS phNxpHal_NfcTmlWrite(uint8_t* pBuffer, uint16_t wLength) {
+  return phTmlNfc_Write(pBuffer, wLength);
+}
+
+bool phNxpNciHal_IsHciPipeRequireToCreate() {
+  if (nxpncihal_ctrl.halStatus == HAL_STATUS_CLOSE || gWiredSeHandle != NULL)
+    return false;
+
+  return true;
+}
 NFCSTATUS phNxpHal_NfcSendExtCmd(uint16_t cmd_len, uint8_t* p_cmd,
                                  uint16_t* rsp_len, uint8_t* p_rsp) {
   return phNxpNciHal_send_ext_cmd(cmd_len, p_cmd, rsp_len, p_rsp);

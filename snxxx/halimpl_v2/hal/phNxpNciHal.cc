@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2025 NXP
+ * Copyright 2012-2026 NXP
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1699,6 +1699,22 @@ int phNxpNciHal_core_initialized(uint16_t core_init_rsp_params_len,
       fpVerInfoStoreInEeprom();
     }
   }
+  if (IS_CHIP_TYPE_GE(sn100u) && isNxpConfigModified()) {
+    // Reset the exit-frame data whenever the configuration value is set to 0.
+    uint8_t no_of_exit_frames_supported = 0x00;
+    bool isFound = GetNxpNumValue(NAME_NXP_NUMBER_OF_EXIT_FRAMES_SUPPORTED,
+                                  &no_of_exit_frames_supported,
+                                  sizeof(no_of_exit_frames_supported));
+    if (isFound && no_of_exit_frames_supported == 0x00) {
+      uint8_t reset_exit_frames[] = {0x2F, 0x0C, 0x05, 0x06,
+                                     0x00, 0x00, 0x00, 0x00};
+      status = phNxpNciHal_send_ext_cmd(sizeof(reset_exit_frames),
+                                        reset_exit_frames, &rsp_len, rsp);
+      if (status != NFCSTATUS_SUCCESS) {
+        NXPLOG_NCIHAL_E("Failed to send exit frame command with zero frames");
+      }
+    }
+  }
   config_access = false;
   if (fw_dwnld_flag || setConfigAlways || isNxpRFConfigModified() ||
       isLibNfcUpdateConfigModified()) {
@@ -1863,6 +1879,17 @@ int phNxpNciHal_core_initialized(uint16_t core_init_rsp_params_len,
       mEEPROM_info.request_mode = SET_EEPROM_DATA;
       request_EEPROM(&mEEPROM_info);
     }
+  }
+
+  if (GetNxpNumValue(NAME_NXP_RF_Q_FULL_ERROR_NTF, static_cast<void*>(&retlen),
+                     sizeof(retlen))) {
+    uint8_t value = static_cast<uint8_t>(retlen);
+    NXPLOG_NCIHAL_D("RF_Q_FULL_ERROR_NTF %x", value);
+    mEEPROM_info.buffer = &value;
+    mEEPROM_info.bufflen = sizeof(value);
+    mEEPROM_info.request_type = EEPROM_RF_Q_FULL_ERROR_NTF;
+    mEEPROM_info.request_mode = SET_EEPROM_DATA;
+    request_EEPROM(&mEEPROM_info);
   }
 
   config_access = false;
@@ -2365,6 +2392,33 @@ void phNxpNciHal_clean_resources() {
   phNxpNciHal_release_info();
   /* reset config cache */
   resetNxpConfig();
+}
+
+/******************************************************************************
+ * Function         phNxpNciHal_configDiscIdle
+ *
+ * Description      Enable to send RF idle on nfc service death recipient when
+ *                  power tracker feature is enabled.
+ *
+ * Returns          none.
+ *
+ ******************************************************************************/
+void phNxpNciHal_configDiscIdle(void) {
+  NFCSTATUS status;
+  unsigned long num = 0;
+  uint8_t rsp[PHNCI_MAX_DATA_LEN] = {0};
+  uint16_t rsp_len = 0;
+  uint8_t cmd_disable_disc[] = {0x21, 0x06, 0x01, 0x00};
+  if ((GetNxpNumValue(NAME_NXP_SYSTEM_POWER_TRACE_POLL_DURATION, &num,
+                      sizeof(num)))) {
+    if ((uint8_t)num > 0) {
+      status = phNxpNciHal_send_ext_cmd(sizeof(cmd_disable_disc),
+                                        cmd_disable_disc, &rsp_len, rsp);
+      if (status != NFCSTATUS_SUCCESS) {
+        NXPLOG_NCIHAL_E("%s: CMD_DISABLE_DISCOVERY: Failed", __func__);
+      }
+    }
+  }
 }
 
 /******************************************************************************
