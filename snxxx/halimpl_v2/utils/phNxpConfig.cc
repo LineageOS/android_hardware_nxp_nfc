@@ -806,8 +806,17 @@ void CNfcConfig::readNciUpdateConfig(const char* fileName) const {
 **
 *******************************************************************************/
 void CNfcConfig::readNxpRFConfig(const char* fileName) const {
-  ALOGD("readNxpRFConfig-Enter..Reading %s", fileName);
-  const_cast<CNfcConfig*>(this)->readConfig(fileName, false);
+  std::string rfPath;
+  struct stat file_stat;
+  if (stat(fileName, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
+    rfPath = fileName;
+  } else if (!findConfigFilePathFromTransportConfigPaths("libnfc-nxp_RF.conf", rfPath)) {
+    ALOGE("readNxpRFConfig-Enter..RF config not found");
+    return;
+  }
+
+  ALOGD("readNxpRFConfig-Enter..Reading %s", rfPath.c_str());
+  const_cast<CNfcConfig*>(this)->readConfig(rfPath.c_str(), false);
 }
 
 /*******************************************************************************
