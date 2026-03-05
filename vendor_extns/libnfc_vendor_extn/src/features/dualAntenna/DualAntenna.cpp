@@ -47,13 +47,23 @@ DualAntenna *DualAntenna::getInstance() {
 NFCSTATUS DualAntenna::handleVendorNciMessage(uint16_t dataLen,
                                               uint8_t *pData) {
   NFCSTATUS status = NFCSTATUS_EXTN_FEATURE_FAILURE;
+  uint8_t num = 0;
 
   if ((mDualAntennaContext.mDualAntennaFeature == true) &&
-      ((dataLen == CON_DISC_PARAM_LENGTH) &&
-       (pData[NCI_GID_INDEX] == 0x20 && pData[NCI_OID_INDEX] == 0x02))) {
+      ((dataLen == CON_DISC_PARAM_LENGTH) && pData[NCI_GID_INDEX] == 0x20 &&
+       pData[NCI_OID_INDEX] == 0x02 && pData[NCI_MSG_LEN_INDEX] == 0x04 &&
+       pData[NCI_MSG_INDEX_FEATURE_VALUE] == 0x02)) {
     if (pData[READER_MODE_CONFIG_INDEX] == 0x01) {
       return sendConDiscParamCmd();
     }
+  }
+
+  if ((mDualAntennaContext.mDualAntennaFeature == true) &&
+    (pData[NCI_GID_INDEX] == 0x21 && pData[NCI_OID_INDEX] == 0x03)) {
+      if (NFCSTATUS_SUCCESS == sendRfDiscCmd())
+        return NFCSTATUS_EXTN_FEATURE_SUCCESS;
+      else
+        return NFCSTATUS_EXTN_FEATURE_FAILURE;
   }
 
   if ((dataLen < CMD_MIN_DATA_LENGTH) ||
@@ -94,12 +104,43 @@ NFCSTATUS DualAntenna::handleVendorNciMessage(uint16_t dataLen,
   }
 
   case DUAL_ANTENNA_SET_READER_MODE: {
-    mDualAntennaContext.mDualAntennaRequest = true;
-    mDualAntennaContext.mConfigReaderMode =
-        pData[DUAL_ANTENNA_PHONE_STATE_INDEX];
-    mDualAntennaContext.mAntennaFeature = DUAL_ANTENNA_SET_READER_MODE;
-    status = sendRfDeactivate(pData);
+    if (PlatformAbstractionLayer::getInstance()->palGetNxpNumValue(
+        NAME_NXP_DUAL_ANTENNA_FOLDABLE, &num, sizeof(num))) {
+      if (num != 0x00 && (num | DUAL_ANTENNA_FOLDABLE) == DUAL_ANTENNA_FOLDABLE) {
+        mDualAntennaContext.mDualAntennaRequest = true;
+        mDualAntennaContext.mConfigReaderMode =
+          pData[DUAL_ANTENNA_PHONE_STATE_INDEX];
+        mDualAntennaContext.mAntennaFeature = DUAL_ANTENNA_SET_READER_MODE;
+        status = sendRfDeactivate(pData);
+      }
+    } else {
+      status = NFCSTATUS_FAILED;
+    }
     break;
+  }
+
+  case DUAL_ANTENNA_GET_DISCOVERY_TECH: {
+
+    uint8_t GET_DISCOVERY_TECH_STATUS_RSP[] = {
+    (NCI_MT_RSP | NCI_GID_PROP), NCI_ROW_PROP_OID_VAL,
+    DUAL_ANTENNA_GET_DISC_PAYLOAD_TWO_LEN, pData[DUAL_ANTENNA_SUB_GID_OID_INDEX],
+     mDualAntennaContext.mAntOneConfig, mDualAntennaContext.mAntTwoConfig};
+
+    PlatformAbstractionLayer::getInstance()->palSendNfcDataCallback(
+      sizeof(GET_DISCOVERY_TECH_STATUS_RSP), GET_DISCOVERY_TECH_STATUS_RSP);
+    return NFCSTATUS_EXTN_FEATURE_SUCCESS;
+  }
+
+  case DUAL_ANTENNA_GET_READER_MODE: {
+
+    uint8_t GET_READER_MODE_STATUS_RSP[] = {
+    (NCI_MT_RSP | NCI_GID_PROP), NCI_ROW_PROP_OID_VAL,
+    DUAL_ANTENNA_PAYLOAD_TWO_LEN, pData[DUAL_ANTENNA_SUB_GID_OID_INDEX],
+     mDualAntennaContext.mConfigReaderMode};
+
+    PlatformAbstractionLayer::getInstance()->palSendNfcDataCallback(
+      sizeof(GET_READER_MODE_STATUS_RSP), GET_READER_MODE_STATUS_RSP);
+    return NFCSTATUS_EXTN_FEATURE_SUCCESS;
   }
 
   default: {
@@ -239,21 +280,13 @@ bool DualAntenna::isDualAntennaSupported() {
 }
 
 NFCSTATUS DualAntenna::setDualAntennaPollMode() {
-  uint8_t num = 0;
   vector<uint8_t> cmd_dual_antenna_set_polling = {0x20, 0x02, 0x04, 0x01,
                                                   0x02, 0X01, 0x01};
-  if (!(PlatformAbstractionLayer::getInstance()->palGetNxpNumValue(
-          NAME_NXP_DUAL_ANTENNA_FOLDABLE, &num, sizeof(num))))
-    return NFCSTATUS_FAILED;
-  if (num != 0x00 && (num | DUAL_ANTENNA_FOLDABLE) == DUAL_ANTENNA_FOLDABLE) {
-    cmd_dual_antenna_set_polling[READER_MODE_CONFIG_INDEX] =
-        mDualAntennaContext.mConfigReaderMode;
-    return PlatformAbstractionLayer::getInstance()->palenQueueWrite(
-        cmd_dual_antenna_set_polling.data(),
-        cmd_dual_antenna_set_polling.size());
-  } else {
-    return NFCSTATUS_FAILED;
-  }
+  cmd_dual_antenna_set_polling[READER_MODE_CONFIG_INDEX] =
+      mDualAntennaContext.mConfigReaderMode;
+  return PlatformAbstractionLayer::getInstance()->palenQueueWrite(
+      cmd_dual_antenna_set_polling.data(),
+      cmd_dual_antenna_set_polling.size());
 }
 
 NFCSTATUS DualAntenna::sendRfDeactivate(const uint8_t *pData) {
