@@ -51,13 +51,13 @@
   (pbf) = (*(p) & NCI_PBF_MASK) >> NCI_PBF_SHIFT;                              \
   (gid) = *(p)++ & NCI_GID_MASK;
 
-/* Parses byte1 of NCI Cmd/Ntf */
+/* parse byte1 of NCI Cmd/Ntf */
 #define NCI_MSG_PRS_HDR1(p, oid)                                               \
   (oid) = (*(p) & NCI_OID_MASK);                                               \
   (p)++;
 
 /**********************************************
- * NCI Core Group Opcodes       - 0
+ * NCI Core Group Opcodes        - 0
  **********************************************/
 // #define NCI_MSG_CORE_RESET 0
 // #define NCI_MSG_CORE_INIT 1
@@ -71,7 +71,7 @@
 #define NCI_MSG_CORE_SET_POWER_SUB_STATE 9
 
 /**********************************************
- * RF MANAGEMENT Group Opcodes   - 1
+ * RF MANAGEMENT Group Opcode    - 1
  **********************************************/
 #define NCI_MSG_RF_DISCOVER_MAP 0
 #define NCI_MSG_RF_SET_ROUTING 1

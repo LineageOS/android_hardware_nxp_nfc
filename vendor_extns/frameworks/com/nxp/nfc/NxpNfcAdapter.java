@@ -90,7 +90,7 @@ public final class NxpNfcAdapter implements INxpNfcAdapter {
     private static final int NXP_EN_SN330U = 1;
 
     private static final int NFC_NXP_MW_ANDROID_VER = 17; // Android version used by NFC MW
-    private static final int NFC_NXP_MW_VERSION_MAJ = 0x03; // MW Major Version
+    private static final int NFC_NXP_MW_VERSION_MAJ = 0x04; // MW Major Version
     private static final int NFC_NXP_MW_VERSION_MIN = 0x00; // MW Minor Version
     private static final int NFC_NXP_MW_CUSTOMER_ID = 0x00; // MW Customer ID
     private static final int NFC_NXP_MW_RC_VERSION = 0x00; // MW RC Version
@@ -293,6 +293,25 @@ public final class NxpNfcAdapter implements INxpNfcAdapter {
     public @AutoCardStatus int suspendAutoCard(boolean flag)
         throws IOException {
       return mAutoCardHandler.suspendAutoCard(flag);
+    }
+
+    /**
+     * @brief To be called to set str reader profile's
+     * @return {@link INxpNfcAdapter.setStrReaderProfiles} instance
+     */
+    @Override
+    public @AutoCardStatus int setStrReaderProfiles(byte[] strProfileData)
+        throws IOException {
+      return mAutoCardHandler.setStrReaderProfiles(strProfileData);
+    }
+    /**
+     * @brief To be called to set str activated AID to NFCC
+     * @return {@link INxpNfcAdapter.setStrReaderProfiles} instance
+     */
+    @Override
+    public @AutoCardStatus int setStrActivatedAID(byte[] aid)
+        throws IOException {
+      return mAutoCardHandler.setStrActivatedAID(aid);
     }
 
     /**
@@ -678,18 +697,18 @@ public final class NxpNfcAdapter implements INxpNfcAdapter {
      *     instance
      */
     @Override
-    public @DualAntennaStatus int[] getDiscoveryTechnology_DualAntenna()
+    public int[] getDiscoveryTechnology_DualAntenna()
         throws IOException {
       return mDualAntennaHandler.getDiscoveryTechnology_DualAntenna();
     }
 
     /**
      * @brief To be called to get the polling mode of both antennas.
-     * @return {@link INxpNfcDualAntenna.getDiscoveryTechnology_DualAntenna}
+     * @return {@link INxpNfcDualAntenna.getPollingMode_DualAntenna}
      *     instance
      */
     @Override
-    public @DualAntennaStatus int getPollingMode_DualAntenna()
+    public int getPollingMode_DualAntenna()
         throws IOException {
       return mDualAntennaHandler.getPollingMode_DualAntenna();
     }
