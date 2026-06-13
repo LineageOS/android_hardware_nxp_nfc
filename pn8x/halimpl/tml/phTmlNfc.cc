@@ -349,13 +349,16 @@ static void* phTmlNfc_TmlThread(void* pParam) {
           sem_post(&gpphTmlNfc_Context->rxSemaphore);
         } else {
           pthread_mutex_lock(&gpphTmlNfc_Context->readInfoUpdateMutex);
-          memcpy(gpphTmlNfc_Context->tReadInfo.pBuffer, temp, dwNoBytesWrRd);
+          if (gpphTmlNfc_Context->tReadInfo.pBuffer != NULL) {
+            memcpy(gpphTmlNfc_Context->tReadInfo.pBuffer, temp, dwNoBytesWrRd);
+          }
           readRetryDelay = 0;
 
           NXPLOG_TML_D("PN54X - I2C Read successful.....\n");
           /* This has to be reset only after a successful read */
           gpphTmlNfc_Context->tReadInfo.bEnable = 0;
           if ((phTmlNfc_e_EnableRetrans == gpphTmlNfc_Context->eConfig) &&
+              (gpphTmlNfc_Context->tReadInfo.pBuffer != NULL) &&
               (0x00 != (gpphTmlNfc_Context->tReadInfo.pBuffer[0] & 0xE0))) {
             NXPLOG_TML_D("PN54X - Retransmission timer stopped.....\n");
             /* Stop Timer to prevent Retransmission */
@@ -373,9 +376,11 @@ static void* phTmlNfc_TmlThread(void* pParam) {
           }
           /* Update the actual number of bytes read including header */
           gpphTmlNfc_Context->tReadInfo.wLength = (uint16_t)(dwNoBytesWrRd);
-          phNxpNciHal_print_packet("RECV",
-                                   gpphTmlNfc_Context->tReadInfo.pBuffer,
-                                   gpphTmlNfc_Context->tReadInfo.wLength);
+          if (gpphTmlNfc_Context->tReadInfo.pBuffer != NULL) {
+            phNxpNciHal_print_packet("RECV",
+                                     gpphTmlNfc_Context->tReadInfo.pBuffer,
+                                     gpphTmlNfc_Context->tReadInfo.wLength);
+          }
 
           dwNoBytesWrRd = PH_TMLNFC_RESET_VALUE;
 
@@ -813,6 +818,7 @@ NFCSTATUS phTmlNfc_ReadAbort(void) {
 
   /*Reset the flag to accept another Read Request */
   gpphTmlNfc_Context->tReadInfo.bThreadBusy = false;
+  gpphTmlNfc_Context->tReadInfo.pBuffer = NULL;
   wStatus = NFCSTATUS_SUCCESS;
 
   return wStatus;
