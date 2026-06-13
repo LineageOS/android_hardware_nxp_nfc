@@ -572,6 +572,7 @@ NFCSTATUS phTmlNfc_ReadAbort(void) {
 
   /*Reset the flag to accept another Read Request */
   gpphTmlNfc_Context->tReadInfo.bThreadBusy = false;
+  gpphTmlNfc_Context->tReadInfo.pBuffer = NULL;
   wStatus = NFCSTATUS_SUCCESS;
 
   return wStatus;
