@@ -273,6 +273,11 @@ void* phNxpNciHal_client_thread(void* arg) {
     /* Fetch next message from the NFC stack message queue */
     if (phDal4Nfc_msgrcv(p_nxpncihal_ctrl->gDrvCfg.nClientId, &msg, 0, 0) ==
         -1) {
+      if (p_nxpncihal_ctrl->thread_running == 0 ||
+          p_nxpncihal_ctrl->gDrvCfg.nClientId == 0) {
+        NXPLOG_NCIHAL_E("NFC client thread terminating");
+        break;
+      }
       NXPLOG_NCIHAL_E("NFC client received bad message");
       continue;
     }
@@ -490,9 +495,12 @@ static NFCSTATUS phNxpNciHal_force_fw_download(uint8_t seq_handler_offset,
       fw_download_success = TRUE;
     } else if (status == NFCSTATUS_FW_CHECK_INTEGRITY_FAILED ||
                (phNxpNciHal_fw_mw_ver_check() != NFCSTATUS_SUCCESS)) {
+      intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
+      nxpncihal_ctrl.gDrvCfg.nClientId = 0;
       phOsalNfc_Timer_Cleanup();
       phNxpTempMgr::GetInstance().Reset();
       phTmlNfc_Shutdown_CleanUp();
+      phDal4Nfc_msgrelease(client_id);
       return NFCSTATUS_CMD_ABORTED;
     }
 
@@ -2567,6 +2575,8 @@ close_and_return:
     status = phTmlNfc_ReadAbort();
     status = phTmlNfc_WriteAbort();
 
+    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     status = phTmlNfc_Shutdown();
@@ -2578,7 +2588,7 @@ close_and_return:
     phNxpTempMgr::GetInstance().Reset();
     phTmlNfc_CleanUp();
 
-    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
+    phDal4Nfc_msgrelease(client_id);
 
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
 
@@ -2648,6 +2658,8 @@ void phNxpNciHal_clean_resources() {
     if (status != NFCSTATUS_SUCCESS) {
       NXPLOG_TML_E("phTmlNfc_ReadAbort Failed");
     }
+    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     status = phTmlNfc_Shutdown();
@@ -2663,7 +2675,7 @@ void phNxpNciHal_clean_resources() {
     phNxpTempMgr::GetInstance().Reset();
     phTmlNfc_CleanUp();
 
-    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
+    phDal4Nfc_msgrelease(client_id);
 
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
   }

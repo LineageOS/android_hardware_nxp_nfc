@@ -321,6 +321,7 @@ static NFCSTATUS phNxpNciHal_force_fw_download(uint8_t seq_handler_offset,
       fw_download_success = true;
     } else if (status == NFCSTATUS_FW_CHECK_INTEGRITY_FAILED ||
                (phNxpNciHal_fw_mw_ver_check() != NFCSTATUS_SUCCESS)) {
+      nxpncihal_ctrl.gDrvCfg.nClientId = 0;
       phOsalNfc_Timer_Cleanup();
       phNxpTempMgr::GetInstance().Reset();
       phTmlNfc_Shutdown_CleanUp();
@@ -2304,6 +2305,7 @@ close_and_return:
     phNxpNciHal_complete(NFCSTATUS_SUCCESS, PHNXP_NCIHAL_OP_CLOSE);
     /* Abort any pending read and write */
     (void)phTmlNfc_ReadAbort();
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     (void)phTmlNfc_Shutdown();
@@ -2365,6 +2367,7 @@ void phNxpNciHal_clean_resources() {
     if (status != NFCSTATUS_SUCCESS) {
       NXPLOG_TML_E("phTmlNfc_ReadAbort Failed");
     }
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     status = phTmlNfc_Shutdown();
