@@ -113,6 +113,11 @@ void phNxpNciHal_WriterThread::Run() {
   while (thread_running.load()) {
     memset(&msg, 0x00, sizeof(phLibNfc_Message_t));
     if (phDal4Nfc_msgrcv(writer_queue, &msg, 0, 0) == -1) {
+      if (!thread_running.load() || writer_queue == 0) {
+        NXPLOG_NCIHAL_E(
+            "WriterThread exiting due to msgrcv failure during stop");
+        break;
+      }
       NXPLOG_NCIHAL_E("WriterThread received bad message");
       continue;
     }

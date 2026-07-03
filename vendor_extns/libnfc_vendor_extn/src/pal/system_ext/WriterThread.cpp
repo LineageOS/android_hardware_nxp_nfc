@@ -109,6 +109,11 @@ void WriterThread::Run() {
   while (thread_running.load()) {
     memset(&msg, 0x00, sizeof(phLibNfc_Message_t));
     if (MessageQueue_receive(writer_queue, &msg, 0, 0) == -1) {
+      if (!thread_running.load() || writer_queue == 0) {
+        NXPLOG_EXTNS_E(NXPLOG_ITEM_NXP_GEN_EXTN,
+                       "WriterThread exiting due to thread stop or null queue");
+        break;
+      }
       NXPLOG_EXTNS_E(NXPLOG_ITEM_NXP_GEN_EXTN,
                      "WriterThread received bad message");
       continue;
