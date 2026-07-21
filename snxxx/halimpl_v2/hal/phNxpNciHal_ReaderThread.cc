@@ -84,6 +84,11 @@ void phNxpNciHal_ReaderThread::Run() {
   while (thread_running.load()) {
     memset(&msg, 0x00, sizeof(phLibNfc_Message_t));
     if (phDal4Nfc_msgrcv(nxpncihal_ctrl.gDrvCfg.nClientId, &msg, 0, 0) == -1) {
+      if (!thread_running.load() || nxpncihal_ctrl.gDrvCfg.nClientId == 0) {
+        NXPLOG_NCIHAL_E(
+            "NFC reader thread is not running or queue is invalid, breaking");
+        break;
+      }
       NXPLOG_NCIHAL_E("NFC reader received bad message");
       continue;
     }
