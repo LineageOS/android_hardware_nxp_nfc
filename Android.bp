@@ -36,4 +36,5 @@ subdirs = [
     "snxxx",
     "intf",
     "power-tracker",
+    "pn8x",
 ]
