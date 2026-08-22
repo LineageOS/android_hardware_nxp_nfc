@@ -1317,6 +1317,8 @@ retry:
     if (nxpncihal_ctrl.retry_cnt++ < MAX_RETRY_COUNT) {
       NXPLOG_NCIHAL_D(
           "write_unlocked failed - NFCC Maybe in Standby Mode - Retry");
+      /* delay to give NFCC wake up delay */
+      usleep(1000 * 10);
       goto retry;
     } else {
       NXPLOG_NCIHAL_E(
