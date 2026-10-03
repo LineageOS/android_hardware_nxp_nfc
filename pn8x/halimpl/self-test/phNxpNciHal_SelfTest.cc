@@ -47,6 +47,7 @@ typedef struct nci_test_data {
 static int thread_running = 0;
 static uint32_t timeoutTimerId = 0;
 static int hal_write_timer_fired = 0;
+static pthread_t test_rx_thread;
 
 /* TML Context */
 extern phTmlNfc_Context_t* gpphTmlNfc_Context;
@@ -934,8 +935,10 @@ static void* phNxpNciHal_test_rx_thread(void* arg) {
   while (thread_running == 1) {
     /* Fetch next message from the NFC stack message queue */
     if (phDal4Nfc_msgrcv(gDrvCfg.nClientId, &msg, 0, 0) == -1) {
-      NXPLOG_NCIHAL_E("Received bad message");
-      continue;
+      NXPLOG_NCIHAL_E(
+          "Received bad message; queue gone, stopping self test thread");
+      thread_running = 0;
+      break;
     }
 
     if (thread_running == 0) {
@@ -1147,8 +1150,7 @@ clean_and_return:
  **
  ******************************************************************************/
 NFCSTATUS phNxpNciHal_TestMode_open(void) {
-  /* Thread */
-  pthread_t test_rx_thread;
+  /* Thread handle lives at file scope so TestMode_close() can join it. */
 
   phOsalNfc_Config_t tOsalConfig;
   phTmlNfc_Config_t tTmlConfig;
@@ -1204,7 +1206,7 @@ NFCSTATUS phNxpNciHal_TestMode_open(void) {
 
   pthread_attr_t attr;
   pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
   ret_val =
       pthread_create(&test_rx_thread, &attr, phNxpNciHal_test_rx_thread, NULL);
   pthread_attr_destroy(&attr);
@@ -1251,7 +1253,7 @@ void phNxpNciHal_TestMode_close() {
 
   CONCURRENCY_LOCK();
 
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     /* Abort any pending read and write */
     status = phTmlNfc_ReadAbort();
     status = phTmlNfc_WriteAbort();
@@ -1263,6 +1265,19 @@ void phNxpNciHal_TestMode_close() {
     NXPLOG_NCIHAL_D("phNxpNciHal_close return status = %d", status);
 
     thread_running = 0;
+
+    /* Wake the self test thread so it can observe thread_running == 0 and exit
+     * before its message queue is released (avoids queue use-after-free). */
+    phLibNfc_Message_t wake_msg;
+    memset(&wake_msg, 0x00, sizeof(wake_msg));
+    phDal4Nfc_msgsnd(gDrvCfg.nClientId, &wake_msg, 0);
+
+    if (test_rx_thread != 0) {
+      if (pthread_join(test_rx_thread, (void**)NULL) != 0) {
+        NXPLOG_NCIHAL_E("Fail to kill self test thread!");
+      }
+      test_rx_thread = 0;
+    }
 
     phDal4Nfc_msgrelease(gDrvCfg.nClientId);
 

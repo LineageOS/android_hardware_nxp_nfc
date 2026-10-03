@@ -107,6 +107,7 @@ static void phNxpNciHal_core_initialized_complete(NFCSTATUS status);
 static void phNxpNciHal_power_cycle_complete(NFCSTATUS status);
 static void phNxpNciHal_kill_client_thread(
     phNxpNciHal_Control_t* p_nxpncihal_ctrl);
+static bool phNxpNciHal_terminate_client_thread(intptr_t client_id);
 static void* phNxpNciHal_client_thread(void* arg);
 static void phNxpNciHal_get_clk_freq(void);
 static void phNxpNciHal_set_clock(void);
@@ -178,8 +179,10 @@ static void* phNxpNciHal_client_thread(void* arg) {
     /* Fetch next message from the NFC stack message queue */
     if (phDal4Nfc_msgrcv(p_nxpncihal_ctrl->gDrvCfg.nClientId, &msg, 0, 0) ==
         -1) {
-      NXPLOG_NCIHAL_E("NFC client received bad message");
-      continue;
+      NXPLOG_NCIHAL_E(
+          "NFC client received bad message; queue gone, stopping client thread");
+      p_nxpncihal_ctrl->thread_running = 0;
+      break;
     }
 
     if (p_nxpncihal_ctrl->thread_running == 0) {
@@ -303,6 +306,34 @@ static void phNxpNciHal_kill_client_thread(
 }
 
 /******************************************************************************
+ * Function         phNxpNciHal_terminate_client_thread
+ *
+ * Description      This function stops the client thread and waits for it to
+ *                  exit so that its message queue can be released safely.
+ *
+ * Parameters       client_id - message queue handle read by the client thread
+ *
+ * Returns          true if the thread was reaped and the queue can be
+ *                  released, false if the queue must be leaked instead.
+ *
+ ******************************************************************************/
+static bool phNxpNciHal_terminate_client_thread(intptr_t client_id) {
+  phLibNfc_Message_t msg;
+
+  nxpncihal_ctrl.thread_running = 0;
+
+  memset(&msg, 0x00, sizeof(msg));
+  phDal4Nfc_msgsnd(client_id, &msg, 0);
+
+  if (0 != pthread_join(nxpncihal_ctrl.client_thread, (void**)NULL)) {
+    NXPLOG_TML_E("Fail to kill client thread!");
+    return false;
+  }
+
+  return true;
+}
+
+/******************************************************************************
  * Function         phNxpNciHal_fw_download
  *
  * Description      This function download the PN54X secure firmware to IC. If
@@ -389,7 +420,9 @@ static NFCSTATUS phNxpNciHal_fw_download(void) {
       nxpncihal_ctrl.gDrvCfg.nClientId = 0;
       phOsalNfc_Timer_Cleanup();
       phTmlNfc_Shutdown_CleanUp();
-      phDal4Nfc_msgrelease(client_id);
+      if (phNxpNciHal_terminate_client_thread(client_id)) {
+        phDal4Nfc_msgrelease(client_id);
+      }
       status = NFCSTATUS_FAILED;
     } else {
       NXPLOG_NCIHAL_E("FW download failed, Continue NFCC init");
@@ -2073,7 +2106,9 @@ NFCSTATUS phNxpNciHalRFConfigCmdRecSequence() {
         nxpncihal_ctrl.gDrvCfg.nClientId = 0;
         phOsalNfc_Timer_Cleanup();
         phTmlNfc_Shutdown();
-        phDal4Nfc_msgrelease(client_id);
+        if (phNxpNciHal_terminate_client_thread(client_id)) {
+          phDal4Nfc_msgrelease(client_id);
+        }
         status = NFCSTATUS_FAILED;
       }
       break;
@@ -2185,7 +2220,7 @@ int phNxpNciHal_close(bool bShutdown) {
 
   sem_destroy(&nxpncihal_ctrl.syncSpiNfc);
 
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     phNxpNciHal_close_complete(NFCSTATUS_SUCCESS);
     /* Abort any pending read and write */
     status = phTmlNfc_ReadAbort();
@@ -2237,7 +2272,7 @@ int phNxpNciHal_Minclose(void) {
     NXPLOG_NCIHAL_E("NCI_CORE_RESET: Failed");
   }
   sem_destroy(&nxpncihal_ctrl.syncSpiNfc);
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     phNxpNciHal_close_complete(NFCSTATUS_SUCCESS);
     /* Abort any pending read and write */
     status = phTmlNfc_ReadAbort();
