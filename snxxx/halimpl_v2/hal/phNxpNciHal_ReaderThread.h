@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <cstdbool>
+#include <cstdint>
 
 class phNxpNciHal_ReaderThread {
  public:
@@ -58,5 +59,6 @@ class phNxpNciHal_ReaderThread {
   void Run();
   pthread_t reader_thread;
   volatile std::atomic<bool> thread_running;
+  intptr_t queue_id;
 };
 #endif  // NXPNCIHALREADER_H

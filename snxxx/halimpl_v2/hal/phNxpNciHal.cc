@@ -2205,10 +2205,12 @@ close_and_return:
   sem_destroy(&sem_reset_ntf_received);
   sem_destroy(&nxpncihal_ctrl.syncSpiNfc);
 
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     phNxpNciHal_complete(NFCSTATUS_SUCCESS, PHNXP_NCIHAL_OP_CLOSE);
     /* Abort any pending read and write */
     (void)phTmlNfc_ReadAbort();
+    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     (void)phTmlNfc_Shutdown();
@@ -2223,7 +2225,7 @@ close_and_return:
     phNxpTempMgr::GetInstance().Reset();
     phTmlNfc_CleanUp();
 
-    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
+    phDal4Nfc_msgrelease(client_id);
 
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
 
@@ -2265,13 +2267,15 @@ void phNxpNciHal_clean_resources() {
   sem_destroy(&sem_reset_ntf_received);
   sem_destroy(&nxpncihal_ctrl.syncSpiNfc);
 
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     phNxpNciHal_complete(NFCSTATUS_SUCCESS, PHNXP_NCIHAL_OP_CLOSE);
     /* Abort any pending read and write */
     NFCSTATUS status = phTmlNfc_ReadAbort();
     if (status != NFCSTATUS_SUCCESS) {
       NXPLOG_TML_E("phTmlNfc_ReadAbort Failed");
     }
+    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     status = phTmlNfc_Shutdown();
@@ -2279,11 +2283,18 @@ void phNxpNciHal_clean_resources() {
       NXPLOG_TML_E("phTmlNfc_Shutdown Failed");
     }
 
+    if (true != g_readerThread.Stop()) {
+      NXPLOG_TML_E("Fail to kill Reader thread!");
+    }
+    if (true != g_writerThread.Stop()) {
+      NXPLOG_TML_E("Fail to kill Writer thread!");
+    }
+
     PhNxpEventLogger::GetInstance().Finalize();
     phNxpTempMgr::GetInstance().Reset();
     phTmlNfc_CleanUp();
 
-    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
+    phDal4Nfc_msgrelease(client_id);
 
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
   }
