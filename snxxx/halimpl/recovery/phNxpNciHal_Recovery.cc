@@ -583,7 +583,7 @@ static void phnxpNciHal_partialClose(void) {
   phLibNfc_Message_t msg;
   nxpncihal_ctrl.halStatus = HAL_STATUS_CLOSE;
 
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     msg.eMsgType = NCI_HAL_CLOSE_CPLT_MSG;
     msg.pMsgData = NULL;
     msg.Size = 0;
@@ -591,12 +591,14 @@ static void phnxpNciHal_partialClose(void) {
     /* Abort any pending read and write */
     phTmlNfc_ReadAbort();
     phTmlNfc_WriteAbort();
+    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phTmlNfc_Shutdown();
     if (0 != pthread_join(nxpncihal_ctrl.client_thread, (void**)NULL)) {
       NXPLOG_TML_E("Fail to kill client thread!");
     }
     phTmlNfc_CleanUp();
-    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
+    phDal4Nfc_msgrelease(client_id);
     phNxpNciHal_cleanup_cb_data(&nxpncihal_ctrl.ext_cb_data);
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
     NXPLOG_NCIHAL_D("phnxpNciHal_partialClose - phOsalNfc_DeInit completed");
