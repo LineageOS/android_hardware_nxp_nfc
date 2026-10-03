@@ -264,6 +264,10 @@ static void phNxpNciHal_initialize_debug_enabled_flag() {
 void* phNxpNciHal_client_thread(void* arg) {
   phNxpNciHal_Control_t* p_nxpncihal_ctrl = (phNxpNciHal_Control_t*)arg;
   phLibNfc_Message_t msg;
+  /* Teardown clears gDrvCfg.nClientId before the queue is released and this
+   * thread is joined; keep receiving on our own handle so pending messages
+   * such as NCI_HAL_CLOSE_CPLT_MSG are still delivered. */
+  const intptr_t client_id = p_nxpncihal_ctrl->gDrvCfg.nClientId;
 
   NXPLOG_NCIHAL_D("thread started");
 
@@ -271,8 +275,7 @@ void* phNxpNciHal_client_thread(void* arg) {
 
   while (p_nxpncihal_ctrl->thread_running == 1) {
     /* Fetch next message from the NFC stack message queue */
-    if (phDal4Nfc_msgrcv(p_nxpncihal_ctrl->gDrvCfg.nClientId, &msg, 0, 0) ==
-        -1) {
+    if (phDal4Nfc_msgrcv(client_id, &msg, 0, 0) == -1) {
       NXPLOG_NCIHAL_E("NFC client received bad message");
       continue;
     }
@@ -495,6 +498,15 @@ static NFCSTATUS phNxpNciHal_force_fw_download(uint8_t seq_handler_offset,
       phOsalNfc_Timer_Cleanup();
       phNxpTempMgr::GetInstance().Reset();
       phTmlNfc_Shutdown_CleanUp();
+      /* Stop the client thread before its message queue is released. */
+      if (nxpncihal_ctrl.thread_running) {
+        phLibNfc_Message_t msg = {};
+        nxpncihal_ctrl.thread_running = 0;
+        phDal4Nfc_msgsnd(client_id, &msg, 0);
+        if (0 != pthread_join(nxpncihal_ctrl.client_thread, (void**)NULL)) {
+          NXPLOG_TML_E("Fail to kill client thread!");
+        }
+      }
       phDal4Nfc_msgrelease(client_id);
       return NFCSTATUS_CMD_ABORTED;
     }
