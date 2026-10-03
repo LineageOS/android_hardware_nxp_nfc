@@ -82,16 +82,21 @@ bool phNxpNciHal_WriterThread::Post(phLibNfc_Message_t& msg) {
 }
 
 bool phNxpNciHal_WriterThread::Stop() {
-  if (thread_running.load()) {
-    thread_running.store(false);
+  thread_running.store(false);
+
+  if (writer_queue != 0) {
     phDal4Nfc_msgsempost(writer_queue);
+  }
+
+  if (writer_thread != 0) {
     if (pthread_join(writer_thread, static_cast<void**>(NULL)) != 0) {
       NXPLOG_NCIHAL_E("%s:pthread_join failed", __func__);
-      phDal4Nfc_msgdestroy(writer_queue);
-      writer_queue = 0;
       return false;
     }
     writer_thread = 0;
+  }
+
+  if (writer_queue != 0) {
     phDal4Nfc_msgdestroy(writer_queue);
     writer_queue = 0;
     NXPLOG_NCIHAL_D("WriterThread stopped");
@@ -113,8 +118,10 @@ void phNxpNciHal_WriterThread::Run() {
   while (thread_running.load()) {
     memset(&msg, 0x00, sizeof(phLibNfc_Message_t));
     if (phDal4Nfc_msgrcv(writer_queue, &msg, 0, 0) == -1) {
-      NXPLOG_NCIHAL_E("WriterThread received bad message");
-      continue;
+      NXPLOG_NCIHAL_E(
+          "WriterThread received bad message, stopping writer thread");
+      thread_running.store(false);
+      break;
     }
     if (!thread_running.load()) {
       break;
