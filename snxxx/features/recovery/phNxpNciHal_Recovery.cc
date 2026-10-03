@@ -564,9 +564,10 @@ static NFCSTATUS phnxpNciHal_partialOpen(void) {
 static void phnxpNciHal_partialClose(void) {
   nxpncihal_ctrl.halStatus = HAL_STATUS_CLOSE;
 
-  if (NULL != gpphTmlNfc_Context->pDevHandle) {
+  if (NULL != gpphTmlNfc_Context && NULL != gpphTmlNfc_Context->pDevHandle) {
     /* Abort any pending read and write */
     phTmlNfc_ReadAbort();
+    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phTmlNfc_Shutdown();
     if (true != g_readThread.Stop()) {
       NXPLOG_TML_E("Fail to kill Reader thread!");
