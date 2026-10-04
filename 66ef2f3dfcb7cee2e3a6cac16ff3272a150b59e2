@@ -16,6 +16,24 @@
       "message": "https://review.lineageos.org/c/LineageOS/android_hardware_nxp_nfc/+/506083",
       "revId": "66ef2f3dfcb7cee2e3a6cac16ff3272a150b59e2",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1da9c407_03ddb232",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2026-10-04T08:19:37Z",
+      "side": 1,
+      "message": "aware, but i don\u0027t think it makes sense to waste time fixing this junk.\n\nwould rather just wait for google to fix it while leaving it reverted.",
+      "parentUuid": "b863d2a4_9cd8a38b",
+      "revId": "66ef2f3dfcb7cee2e3a6cac16ff3272a150b59e2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
