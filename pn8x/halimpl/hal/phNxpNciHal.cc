@@ -385,11 +385,8 @@ static NFCSTATUS phNxpNciHal_fw_download(void) {
   if (status != NFCSTATUS_SUCCESS) {
     if (NFCSTATUS_SUCCESS != phNxpNciHal_fw_mw_ver_check()) {
       NXPLOG_NCIHAL_D("Chip Version Middleware Version mismatch!!!!");
-      intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
-      nxpncihal_ctrl.gDrvCfg.nClientId = 0;
       phOsalNfc_Timer_Cleanup();
       phTmlNfc_Shutdown_CleanUp();
-      phDal4Nfc_msgrelease(client_id);
       status = NFCSTATUS_FAILED;
     } else {
       NXPLOG_NCIHAL_E("FW download failed, Continue NFCC init");
@@ -2069,11 +2066,8 @@ NFCSTATUS phNxpNciHalRFConfigCmdRecSequence() {
           (pphTmlNfc_TransactCompletionCb_t)&phNxpNciHal_read_complete, NULL);
       if (status != NFCSTATUS_PENDING) {
         NXPLOG_NCIHAL_E("TML Read status error status = %x", status);
-        intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
-        nxpncihal_ctrl.gDrvCfg.nClientId = 0;
         phOsalNfc_Timer_Cleanup();
         phTmlNfc_Shutdown();
-        phDal4Nfc_msgrelease(client_id);
         status = NFCSTATUS_FAILED;
       }
       break;
@@ -2191,8 +2185,6 @@ int phNxpNciHal_close(bool bShutdown) {
     status = phTmlNfc_ReadAbort();
     status = phTmlNfc_WriteAbort();
 
-    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
-    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     status = phTmlNfc_Shutdown();
@@ -2203,7 +2195,7 @@ int phNxpNciHal_close(bool bShutdown) {
 
     phTmlNfc_CleanUp();
 
-    phDal4Nfc_msgrelease(client_id);
+    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
 
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
 
@@ -2243,8 +2235,6 @@ int phNxpNciHal_Minclose(void) {
     status = phTmlNfc_ReadAbort();
     status = phTmlNfc_WriteAbort();
 
-    intptr_t client_id = nxpncihal_ctrl.gDrvCfg.nClientId;
-    nxpncihal_ctrl.gDrvCfg.nClientId = 0;
     phOsalNfc_Timer_Cleanup();
 
     status = phTmlNfc_Shutdown();
@@ -2255,7 +2245,7 @@ int phNxpNciHal_Minclose(void) {
 
     phTmlNfc_CleanUp();
 
-    phDal4Nfc_msgrelease(client_id);
+    phDal4Nfc_msgrelease(nxpncihal_ctrl.gDrvCfg.nClientId);
 
     memset(&nxpncihal_ctrl, 0x00, sizeof(nxpncihal_ctrl));
 
