@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f945e1e8_dfa3519a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2026-10-04T08:26:38Z",
+      "side": 1,
+      "message": "we instead decided to revert google changes and wait for them to come up with a properly tested fix - https://review.lineageos.org/q/I19e2f5d701cb5c8fb7c2047b9b402696bf52457e",
+      "revId": "ba3c67a18475f54502c644e05bfc8c468f1f9f1e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
