@@ -51,6 +51,23 @@
       "message": "let\u0027s reapply it whenever google makes a proper fix for this thing.",
       "revId": "66ef2f3dfcb7cee2e3a6cac16ff3272a150b59e2",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e6e62618_ac805975",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2026-10-04T08:22:32Z",
+      "side": 1,
+      "message": "There are race conditions when it comes to closing the channel, and possibly yet more uaf issues since the posix timers aren\u0027t synchronized in any way...",
+      "revId": "66ef2f3dfcb7cee2e3a6cac16ff3272a150b59e2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
