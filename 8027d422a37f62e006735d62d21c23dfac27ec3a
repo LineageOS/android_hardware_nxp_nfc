@@ -16,6 +16,23 @@
       "message": "I can confirm that this fixes the \"NFC client received bad message\" spam on the Moto G05/G15 (lamu). Not sure if this is the best solution though.",
       "revId": "8027d422a37f62e006735d62d21c23dfac27ec3a",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e7a1367e_b6c8696c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2026-10-04T08:26:30Z",
+      "side": 1,
+      "message": "we instead decided to revert google changes and wait for them to come up with a properly tested fix - https://review.lineageos.org/q/I19e2f5d701cb5c8fb7c2047b9b402696bf52457e",
+      "revId": "8027d422a37f62e006735d62d21c23dfac27ec3a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
