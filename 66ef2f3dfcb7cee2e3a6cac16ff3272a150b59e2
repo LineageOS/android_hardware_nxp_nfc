@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b863d2a4_9cd8a38b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2026-10-04T08:18:24Z",
+      "side": 1,
+      "message": "https://review.lineageos.org/c/LineageOS/android_hardware_nxp_nfc/+/506083",
+      "revId": "66ef2f3dfcb7cee2e3a6cac16ff3272a150b59e2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
