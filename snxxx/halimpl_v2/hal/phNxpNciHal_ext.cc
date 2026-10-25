@@ -1408,6 +1408,9 @@ retryget:
     status = rsp[3];
     if (status != NFCSTATUS_SUCCESS) {
       ALOGE("failed to get requested memory address");
+      if (status == 0x09) { /* NCI STATUS_INVALID_PARAM */
+        status = NFCSTATUS_FEATURE_NOT_SUPPORTED;
+      }
     } else if (mEEPROM_info->request_mode == GET_EEPROM_DATA) {
       if (mEEPROM_info->bufflen >= 0xFB) {
         /* Max buffer length for single Get Config Command is 0xFF.
